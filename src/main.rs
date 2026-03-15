@@ -11,11 +11,15 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     let token = std::env::var("DISCORD_TOKEN").expect("missing DISCORD_TOKEN");
-    let intents = serenity::GatewayIntents::non_privileged();
+    let intents = serenity::GatewayIntents::non_privileged()
+        | serenity::GatewayIntents::MESSAGE_CONTENT;
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: vec![bot::commands::ask()],
+            event_handler: |ctx, event, framework, data| {
+                bot::handler::event_handler(ctx, event, framework, data)
+            },
             ..Default::default()
         })
         .setup(move |ctx, _ready, framework| {

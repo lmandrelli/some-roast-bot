@@ -2201,7 +2201,9 @@ name = "some-roast-bot"
 version = "0.1.1"
 dependencies = [
  "dotenv",
+ "futures-util",
  "poise",
+ "regex",
  "rig-core",
  "rmcp",
  "serde_json",
