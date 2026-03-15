@@ -76,8 +76,15 @@ Once running, invite the bot to your server using the OAuth2 URL, then type `/as
 
 ```
 src/
-├── main.rs      # Discord client setup, poise framework, /ask slash command
-└── agent.rs     # RoastAgent: LLM agent wired to the Exa MCP web-search tool
+├── main.rs              # Startup wiring: env, framework, bot launch
+├── agents/
+│   ├── mod.rs           # Re-exports
+│   └── ask.rs           # AskAgent: LLM agent wired to the Exa MCP web-search tool
+└── bot/
+    ├── mod.rs           # Shared types (Data, Error, Context)
+    └── commands/
+        ├── mod.rs       # Re-exports all commands
+        └── ask.rs       # /ask slash command
 ```
 
 **Key components:**
@@ -85,8 +92,8 @@ src/
 - **`poise` + `serenity`** — Discord bot framework and gateway client.
 - **`rig-core`** — Agent builder that composes the LLM model with MCP tools.
 - **`rmcp`** — MCP client that connects to `https://mcp.exa.ai/mcp` and exposes web-search tools to the agent.
-- **`RoastAgent`** — Wraps the rig `Agent`, holds the MCP `RunningService` alive for the lifetime of the bot, and exposes a simple `ask(&str)` interface.
-- **`SharedAgent`** — `Arc<RwLock<Option<RoastAgent>>>` shared across the async framework.
+- **`AskAgent`** — Wraps the rig `Agent`, holds the MCP `RunningService` alive for the lifetime of the bot, and exposes a simple `ask(&str)` interface.
+- **`SharedAskAgent`** — `Arc<RwLock<Option<AskAgent>>>` shared across the async framework.
 
 ---
 
