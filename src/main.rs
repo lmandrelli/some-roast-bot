@@ -28,7 +28,7 @@ async fn main() {
 
                 let is_prod = std::env::var("PROD").unwrap_or_default() != "0";
                 let activity_name = if is_prod {
-                    "you should tag me".to_string()
+                    "microsloping".to_string()
                 } else {
                     format!("running v{}", env!("CARGO_PKG_VERSION"))
                 };

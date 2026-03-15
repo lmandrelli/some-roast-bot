@@ -1,5 +1,7 @@
 mod channel;
+mod microsoft;
 mod reply;
+mod truth;
 mod user;
 
 use crate::bot::{Data, Error};
@@ -7,15 +9,19 @@ use futures_util::future::BoxFuture;
 use poise::serenity_prelude::{self as serenity, FullEvent};
 
 pub use channel::handle_channel;
+pub use microsoft::handle_microsoft;
 pub use reply::handle_reply;
+pub use truth::handle_truth;
 pub use user::handle_user;
 
 /// Poise event handler that listens for messages where the bot is tagged.
 ///
 /// Priority logic:
+/// 0a. Message contains Microsoft/Windows keywords -> roast with Microslop/Windaube
 /// 1. Tagged + replying to another message -> roast whoever is wrong between the two users
 /// 2. Tagged + another user also tagged -> fetch last 5 messages from that user, roast them
-/// 3. Tagged alone -> fetch last 10 channel messages, pick and roast someone
+/// 3a. Message contains "is this true?" -> judge the claim using channel context
+/// 3b. Tagged alone -> fetch last 10 channel messages, pick and roast someone
 pub fn event_handler<'a>(
     ctx: &'a serenity::Context,
     event: &'a FullEvent,
@@ -72,6 +78,11 @@ async fn handle_mention(
 ) -> Result<String, Error> {
     let bot_id = ctx.http.get_current_user().await?.id;
 
+    // Priority 0: Message contains Microsoft/Windows keywords
+    if microsoft::contains_microsoft_keywords(&msg.content) {
+        return handle_microsoft(msg).await;
+    }
+
     // Priority 1: Bot is tagged in a reply to another message
     if let Some(ref replied_msg) = msg.referenced_message {
         return handle_reply(msg, replied_msg).await;
@@ -87,8 +98,13 @@ async fn handle_mention(
     if let Some(target_user) = other_mentions.first() {
         return handle_user(ctx, msg, target_user).await;
     }
+    
+    // Priority 3a: Message contains "is this true?"
+    if truth::contains_truth_question(&msg.content) {
+        return handle_truth(ctx, msg).await;
+    }
 
-    // Priority 3: Bot tagged alone - roast based on recent channel context
+    // Priority 3b: Bot tagged alone - roast based on recent channel context
     handle_channel(ctx, msg).await
 }
 

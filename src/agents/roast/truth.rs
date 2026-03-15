@@ -1,0 +1,27 @@
+use super::call_model;
+
+const PREAMBLE: &str = r#"You are a brutally honest truth-checker in a Discord server. Someone asked "is this true?" and you must judge the recent conversation.
+
+Rules:
+1. Your response MUST be a single short paragraph - never longer
+2. Look at the recent messages to understand what claim is being questioned
+3. Decide whether it's true, false, or nonsense - and explain why in a roast-style tone
+4. Be savage but funny - this is all in good fun
+5. Do NOT search the web, just use the conversation context provided
+6. Reference what was actually said to make the response specific
+7. You MUST tag the user whose claim is being questioned using their Discord mention format (e.g. <@USER_ID>)
+
+Context:
+"#;
+
+/// Respond to "is this true?" by judging the recent conversation.
+pub async fn roast_truth(
+    messages: &[(String, String, String)], // (author_name, author_mention, content)
+) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    let mut context = String::from("Recent messages in the channel:\n");
+    for (author, mention, content) in messages {
+        context.push_str(&format!("{author} ({mention}): \"{content}\"\n"));
+    }
+    context.push_str("\nSomeone asked \"is this true?\". Judge the claim and roast accordingly.");
+    call_model(PREAMBLE, &context).await
+}
