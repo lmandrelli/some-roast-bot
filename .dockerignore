@@ -1,0 +1,9 @@
+target/
+.env
+.git/
+.github/
+invite.txt
+README.md
+LICENSE
+*.pdb
+**/*.rs.bk

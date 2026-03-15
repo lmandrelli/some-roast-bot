@@ -1,0 +1,7 @@
+services:
+  some-roast-bot:
+    build: .
+    container_name: some-roast-bot
+    restart: unless-stopped
+    env_file:
+      - .env
