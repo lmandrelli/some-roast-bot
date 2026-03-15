@@ -13,7 +13,13 @@ pub async fn ask(
             ctx.say(response).await?;
         }
         Err(e) => {
-            ctx.say(format!("Error: {}", e)).await?;
+            tracing::error!("Ask command failed: {:?}", e);
+            ctx.send(
+                poise::CreateReply::default()
+                    .content(format!("**Error:** {}", e))
+                    .ephemeral(true),
+            )
+            .await?;
         }
     }
 

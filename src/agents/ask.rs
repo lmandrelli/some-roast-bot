@@ -24,12 +24,16 @@ pub async fn ask(question: &str) -> Result<String, Box<dyn std::error::Error + S
         .inspect_err(|e| tracing::error!("MCP client error: {:?}", e))?;
 
     let tools = service.list_tools(Default::default()).await?;
+    tracing::info!("MCP tools available: {:?}", tools.tools.iter().map(|t| &t.name).collect::<Vec<_>>());
 
     let agent = rig::agent::AgentBuilder::new(model)
         .preamble(PREAMBLE)
         .rmcp_tools(tools.tools, service.peer().clone())
         .build();
 
-    let response = agent.prompt(question).await?;
+    tracing::info!("Sending prompt to model...");
+    let response = agent.prompt(question).await
+        .inspect_err(|e| tracing::error!("Completion error: {:?}", e))?;
+    tracing::info!("Response received: {} chars", response.len());
     Ok(response)
 }
