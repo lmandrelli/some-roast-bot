@@ -5,3 +5,8 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    volumes:
+      - bot-data:/data
+
+volumes:
+  bot-data:

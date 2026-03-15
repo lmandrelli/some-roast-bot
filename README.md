@@ -1,6 +1,6 @@
 # some-roast-bot
 
-A sarcastic Discord bot that roasts you while answering your questions. It uses an AI agent (currently powered by Kimi K2.5, served by [Chutes AI](https://chutes.ai)) with real-time web search via the [Exa MCP](https://exa.ai) server.
+A sarcastic Discord bot that roasts users while answering their questions. Powered by an AI LLM (currently [Kimi K2.5](https://kimi.ai) served by [Chutes AI](https://chutes.ai)) with real-time web search via the [Exa MCP](https://exa.ai) server. All responses are in French.
 
 ---
 
@@ -19,15 +19,28 @@ A sarcastic Discord bot that roasts you while answering your questions. It uses 
 
 ## Features
 
-- **`/ask` command** - Asks the AI agent a question and receives a sarcastic response.
+### Slash Command
+
+- **`/ask <question>`** — Asks the AI a question. The agent searches the web via Exa MCP, then responds with a sarcastic roast that also contains the actual answer.
+
+### Passive Triggers (no mention required)
+
+- **Microsoft/Windows Auto-Roast** — Whenever anyone mentions "Microsoft" or "Windows", the bot automatically searches for the latest Microsoft fails/bugs and roasts them. Uses a SQLite memory to avoid repeating topics. Refers to Microsoft as "Microslop" and Windows as "Windaube".
+- **"Is this true?" Detector** — Detects phrases like "is this true?" or "is that true?", reads recent channel messages, and judges whether the claim is true, false, or nonsense — roast-style.
+
+### Mention-Required Triggers
+
+- **Reply Roast** — Tag the bot inside a reply to another message, and it settles the argument by roasting whoever is wrong.
+- **Targeted User Roast** — Mention the bot alongside another user, and it fetches that user's recent messages and roasts them based on what they said.
+- **Channel Roast** — Mention the bot alone, and it reads recent messages, picks whoever "deserves it most", and roasts them.
 
 ---
 
 ## Prerequisites
 
-- [Rust](https://www.rust-lang.org/tools/install)
+- [Rust](https://www.rust-lang.org/tools/install) (edition 2024)
 - A [Discord bot token](https://discord.com/developers/applications)
-- An OpenAI-compatible API key (the example uses [Chutes AI](https://chutes.ai))
+- An OpenAI-compatible API key (the default uses [Chutes AI](https://chutes.ai))
 
 ---
 
@@ -42,6 +55,12 @@ cd some-roast-bot
 cargo build --release
 ```
 
+Or with Docker:
+
+```bash
+docker compose up --build
+```
+
 ---
 
 ## Configuration
@@ -52,11 +71,14 @@ Copy the example environment file and fill in your credentials:
 cp .env.example .env
 ```
 
-| Variable          | Description                                              | 
-|-------------------|----------------------------------------------------------|
-| `DISCORD_TOKEN`   | Your Discord bot token                                   |
-| `OPENAI_API_KEY`  | API key for the LLM provider (Chutes or OpenAI-compat.)  |
-| `OPENAI_BASE_URL` | Base URL of the OpenAI-compatible API endpoint           |
+| Variable         | Description                                             | Default                         |
+| ---------------- | ------------------------------------------------------- | ------------------------------- |
+| `DISCORD_TOKEN`  | Your Discord bot token                                  | *(required)*                    |
+| `OPENAI_API_KEY` | API key for the LLM provider (Chutes or OpenAI-compat.) | *(required)*                    |
+| `OPENAI_BASE_URL`| Base URL of the OpenAI-compatible API endpoint          | `https://llm.chutes.ai/v1`     |
+| `MODEL_NAME`     | LLM model identifier                                   | `moonshotai/Kimi-K2.5-TEE`     |
+| `PROD`           | Production flag (`1` = prod, `0` = dev status display)  | `1`                             |
+| `MEMORY_DB_PATH` | Path to the SQLite memory database                      | `data/memory.db`                |
 
 > **Note:** The bot reads these variables at startup via [`dotenv`](https://crates.io/crates/dotenv). Never commit your `.env` file.
 
@@ -69,7 +91,12 @@ cp .env.example .env
 cargo run --release
 ```
 
-Once running, invite the bot to your server using the OAuth2 URL, then type `/ask` in any channel the bot has access to.
+Once running, invite the bot to your server using the OAuth2 URL, then:
+
+- Type `/ask` in any channel the bot has access to
+- Mention the bot (with or without tagging another user) to trigger a roast
+- Reply to a message and tag the bot to have it settle an argument
+- Just mention "Microsoft" or "Windows" in any message and watch it react
 
 ---
 
@@ -78,22 +105,43 @@ Once running, invite the bot to your server using the OAuth2 URL, then type `/as
 ```
 src/
 ├── main.rs              # Startup wiring: env, framework, bot launch
+├── memory.rs            # SQLite-backed topic deduplication memory
 ├── agents/
-│   ├── mod.rs           # Re-exports
-│   └── ask.rs           # Stateless ask() function: connects to MCP, prompts the LLM, returns
+│   ├── mod.rs           # Re-exports + model_name() helper
+│   ├── ask.rs           # /ask agent: MCP + LLM with web search
+│   └── roast/
+│       ├── mod.rs       # Shared call_model() helper
+│       ├── channel.rs   # Roast based on recent channel messages
+│       ├── user.rs      # Roast a specific tagged user
+│       ├── reply.rs     # Settle an argument between two users
+│       ├── truth.rs     # Judge "is this true?" claims
+│       └── microsoft.rs # Auto-roast on Microsoft/Windows mentions (MCP + memory)
 └── bot/
     ├── mod.rs           # Shared types (Data, Error, Context)
-    └── commands/
-        ├── mod.rs       # Re-exports all commands
-        └── ask.rs       # /ask slash command
+    ├── commands/
+    │   ├── mod.rs       # Re-exports
+    │   └── ask.rs       # /ask slash command handler
+    └── handlers/
+        ├── mod.rs       # Event handler + priority dispatch logic
+        ├── channel.rs   # Channel roast handler
+        ├── user.rs      # Targeted user roast handler
+        ├── reply.rs     # Reply-chain roast handler
+        ├── truth.rs     # Truth-check handler
+        └── microsoft.rs # Microsoft/Windows keyword detector
 ```
 
 **Key components:**
 
 - **`poise` + `serenity`** — Discord bot framework and gateway client.
 - **`rig-core`** — Agent builder that composes the LLM model with MCP tools.
-- **`rmcp`** — MCP client that connects to `https://mcp.exa.ai/mcp` and exposes web-search tools to the agent.
-- **`agents::ask()`** — Stateless async function that cold-starts an MCP connection and a rig agent on each invocation. Everything is dropped when the call completes, so there is no shared state or long-lived connection to manage.
+- **`rmcp`** — MCP client that connects to Exa's search server and exposes web-search tools to the agent.
+- **`rusqlite`** — SQLite database for topic deduplication memory (Microsoft roast).
+
+**Design notes:**
+
+- **Stateless agents** — Each request cold-starts a new MCP connection and rig agent. Everything is dropped when the call completes, so there is no shared state or long-lived connection to manage.
+- **Priority-based dispatch** — Event handlers are checked in order: Microsoft keywords > truth questions > reply roast > user roast > channel roast.
+- **Separation of concerns** — `agents/` contains pure async LLM logic (no Discord awareness). `bot/` handles all Discord interaction. The AI logic could be reused outside of Discord.
 
 ---
 
@@ -112,7 +160,7 @@ The project includes a CI/CD pipeline that automatically builds a Docker image a
 1. **Create the stack** in Portainer:
    - Go to **Stacks > Add stack**
    - Choose **Web editor** and paste the content of `docker-compose.yml`
-   - Under **Environment variables**, add the variables from `.env.example` (`DISCORD_TOKEN`, `OPENAI_API_KEY`, `OPENAI_BASE_URL`) with your actual values. Alternatively, upload a `stack.env` file.
+   - Under **Environment variables**, add the variables from `.env.example` with your actual values. Alternatively, upload a `stack.env` file.
 
 2. **Enable the stack webhook** for automatic redeployment:
    - After creating the stack, go to the stack's settings
@@ -139,4 +187,4 @@ This triggers the GitHub Actions workflow, which builds and pushes the image tag
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).  
+This project is licensed under the [MIT License](LICENSE).
