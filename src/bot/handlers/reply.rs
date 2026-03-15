@@ -1,4 +1,4 @@
-use poise::serenity_prelude as serenity;
+use poise::serenity_prelude::{self as serenity, Mentionable};
 
 use crate::bot::Error;
 
@@ -17,9 +17,19 @@ pub async fn handle_reply(
     );
 
     let tagger_name = &msg.author.name;
+    let tagger_mention = msg.author.id.mention().to_string();
     let tagger_content = strip_mentions(&msg.content);
     let target_name = &replied_msg.author.name;
+    let target_mention = replied_msg.author.id.mention().to_string();
     let target_content = &replied_msg.content;
 
-    crate::agents::roast_reply(tagger_name, &tagger_content, target_name, target_content).await
+    crate::agents::roast_reply(
+        tagger_name,
+        &tagger_mention,
+        &tagger_content,
+        target_name,
+        &target_mention,
+        target_content,
+    )
+    .await
 }

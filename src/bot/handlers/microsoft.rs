@@ -1,4 +1,4 @@
-use poise::serenity_prelude as serenity;
+use poise::serenity_prelude::{self as serenity, Mentionable};
 
 use crate::bot::Error;
 
@@ -18,5 +18,10 @@ pub async fn handle_microsoft(msg: &serenity::Message) -> Result<String, Error> 
     );
 
     let clean_content = strip_mentions(&msg.content);
-    crate::agents::roast_microsoft(&msg.author.name, &clean_content).await
+    crate::agents::roast_microsoft(
+        &msg.author.name,
+        &msg.author.id.mention().to_string(),
+        &clean_content,
+    )
+    .await
 }

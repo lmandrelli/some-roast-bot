@@ -2,11 +2,14 @@ use poise::serenity_prelude::{self as serenity, Mentionable};
 
 use crate::bot::Error;
 
-/// Checks whether a message contains "is this true?" (case-insensitive,
-/// tolerant of an optional space before the question mark).
+/// Checks whether a message contains "is this true?" or "is that true?"
+/// (case-insensitive, tolerant of an optional space before the question mark).
 pub fn contains_truth_question(content: &str) -> bool {
     let lower = content.to_lowercase();
-    lower.contains("is this true?") || lower.contains("is this true ?")
+    lower.contains("is this true?")
+        || lower.contains("is this true ?")
+        || lower.contains("is that true?")
+        || lower.contains("is that true ?")
 }
 
 /// Responds to "is this true?" by fetching recent channel messages

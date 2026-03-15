@@ -18,14 +18,15 @@ async fn call_model(
     preamble: &str,
     prompt: &str,
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    let model_name = crate::agents::model_name();
     let openai_client = CompletionsClient::from_env();
-    let model = openai_client.completion_model("moonshotai/Kimi-K2.5-TEE");
+    let model = openai_client.completion_model(&model_name);
 
     let agent = rig::agent::AgentBuilder::new(model)
         .preamble(preamble)
         .build();
 
-    tracing::info!("Sending roast prompt to model...");
+    tracing::info!("Sending roast prompt to model ({model_name})...");
     let response = agent
         .prompt(prompt)
         .await

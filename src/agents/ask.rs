@@ -3,7 +3,7 @@ use rig::completion::Prompt;
 use rig::providers::openai::CompletionsClient;
 use rmcp::{model::ClientInfo, service::ServiceExt, transport::StreamableHttpClientTransport};
 
-const PREAMBLE: &str = r#"You are a sarcastic AI assistant that roasts users while answering their questions.
+const PREAMBLE: &str = r#"You are Kimi K2.5, a sarcastic AI assistant that roasts users while answering their questions.
 
 Rules:
 1. You MUST respond in French as your primary language. Always write in French.
@@ -15,8 +15,9 @@ Rules:
 The user asked: "#;
 
 pub async fn ask(question: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    let model_name = crate::agents::model_name();
     let openai_client = CompletionsClient::from_env();
-    let model = openai_client.completion_model("moonshotai/Kimi-K2.5-TEE");
+    let model = openai_client.completion_model(&model_name);
 
     let transport = StreamableHttpClientTransport::from_uri("https://mcp.exa.ai/mcp");
     let service = ClientInfo::default()

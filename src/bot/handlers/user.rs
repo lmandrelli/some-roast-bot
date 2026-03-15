@@ -1,4 +1,4 @@
-use poise::serenity_prelude as serenity;
+use poise::serenity_prelude::{self as serenity, Mentionable};
 
 use crate::bot::Error;
 
@@ -30,6 +30,7 @@ pub async fn handle_user(
 
     let tagger_name = &msg.author.name;
     let target_name = &target_user.name;
+    let target_mention = target_user.id.mention().to_string();
 
-    crate::agents::roast_user(tagger_name, target_name, &target_messages).await
+    crate::agents::roast_user(tagger_name, target_name, &target_mention, &target_messages).await
 }
