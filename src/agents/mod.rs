@@ -1,3 +1,3 @@
 mod ask;
 
-pub use ask::{AskAgent, SharedAskAgent};
+pub use ask::ask;

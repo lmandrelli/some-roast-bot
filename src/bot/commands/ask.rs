@@ -8,10 +8,7 @@ pub async fn ask(
 ) -> Result<(), Error> {
     ctx.defer().await?;
 
-    let agent_read = ctx.data().agent.read().await;
-    let agent = agent_read.as_ref().ok_or("Agent not initialized")?;
-
-    match agent.ask(&question).await {
+    match crate::agents::ask(&question).await {
         Ok(response) => {
             ctx.say(response).await?;
         }

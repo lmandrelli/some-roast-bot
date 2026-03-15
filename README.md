@@ -79,7 +79,7 @@ src/
 ├── main.rs              # Startup wiring: env, framework, bot launch
 ├── agents/
 │   ├── mod.rs           # Re-exports
-│   └── ask.rs           # AskAgent: LLM agent wired to the Exa MCP web-search tool
+│   └── ask.rs           # Stateless ask() function: connects to MCP, prompts the LLM, returns
 └── bot/
     ├── mod.rs           # Shared types (Data, Error, Context)
     └── commands/
@@ -92,8 +92,7 @@ src/
 - **`poise` + `serenity`** — Discord bot framework and gateway client.
 - **`rig-core`** — Agent builder that composes the LLM model with MCP tools.
 - **`rmcp`** — MCP client that connects to `https://mcp.exa.ai/mcp` and exposes web-search tools to the agent.
-- **`AskAgent`** — Wraps the rig `Agent`, holds the MCP `RunningService` alive for the lifetime of the bot, and exposes a simple `ask(&str)` interface.
-- **`SharedAskAgent`** — `Arc<RwLock<Option<AskAgent>>>` shared across the async framework.
+- **`agents::ask()`** — Stateless async function that cold-starts an MCP connection and a rig agent on each invocation. Everything is dropped when the call completes, so there is no shared state or long-lived connection to manage.
 
 ---
 
