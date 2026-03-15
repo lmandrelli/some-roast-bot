@@ -18,7 +18,7 @@ async fn main() {
         .options(poise::FrameworkOptions {
             commands: vec![bot::commands::ask()],
             event_handler: |ctx, event, framework, data| {
-                bot::handler::event_handler(ctx, event, framework, data)
+                bot::handlers::event_handler(ctx, event, framework, data)
             },
             ..Default::default()
         })

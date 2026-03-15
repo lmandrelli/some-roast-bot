@@ -1,6 +1,14 @@
+mod channel;
+mod reply;
+mod user;
+
 use crate::bot::{Data, Error};
 use futures_util::future::BoxFuture;
-use poise::serenity_prelude::{self as serenity, FullEvent, Mentionable};
+use poise::serenity_prelude::{self as serenity, FullEvent};
+
+pub use channel::handle_channel;
+pub use reply::handle_reply;
+pub use user::handle_user;
 
 /// Poise event handler that listens for messages where the bot is tagged.
 ///
@@ -66,20 +74,7 @@ async fn handle_mention(
 
     // Priority 1: Bot is tagged in a reply to another message
     if let Some(ref replied_msg) = msg.referenced_message {
-        tracing::info!("Priority 1: Reply roast between {} and {}", msg.author.name, replied_msg.author.name);
-
-        let tagger_name = &msg.author.name;
-        let tagger_content = strip_mentions(&msg.content);
-        let target_name = &replied_msg.author.name;
-        let target_content = &replied_msg.content;
-
-        return crate::agents::roast_reply(
-            tagger_name,
-            &tagger_content,
-            target_name,
-            target_content,
-        )
-        .await;
+        return handle_reply(msg, replied_msg).await;
     }
 
     // Priority 2: Bot is tagged alongside another user
@@ -90,55 +85,11 @@ async fn handle_mention(
         .collect();
 
     if let Some(target_user) = other_mentions.first() {
-        tracing::info!(
-            "Priority 2: User roast - {} wants to roast {}",
-            msg.author.name,
-            target_user.name
-        );
-
-        // Fetch last 25 messages from the channel and filter by the target user (up to 5)
-        let builder = serenity::builder::GetMessages::new()
-            .before(msg.id)
-            .limit(25);
-        let messages = msg.channel_id.messages(&ctx.http, builder).await?;
-
-        let target_messages: Vec<(String, String)> = messages
-            .iter()
-            .filter(|m| m.author.id == target_user.id)
-            .take(5)
-            .map(|m| (m.author.name.clone(), m.content.clone()))
-            .collect();
-
-        let tagger_name = &msg.author.name;
-        let target_name = &target_user.name;
-
-        return crate::agents::roast_user(tagger_name, target_name, &target_messages).await;
+        return handle_user(ctx, msg, target_user).await;
     }
 
     // Priority 3: Bot tagged alone - roast based on recent channel context
-    tracing::info!(
-        "Priority 3: Channel roast triggered by {}",
-        msg.author.name
-    );
-
-    let builder = serenity::builder::GetMessages::new()
-        .before(msg.id)
-        .limit(10);
-    let messages = msg.channel_id.messages(&ctx.http, builder).await?;
-
-    let context_messages: Vec<(String, String, String)> = messages
-        .iter()
-        .filter(|m| !m.author.bot)
-        .map(|m| {
-            (
-                m.author.name.clone(),
-                m.author.id.mention().to_string(),
-                m.content.clone(),
-            )
-        })
-        .collect();
-
-    crate::agents::roast_channel(&context_messages).await
+    handle_channel(ctx, msg).await
 }
 
 /// Remove bot mentions from message content so the prompt is cleaner.

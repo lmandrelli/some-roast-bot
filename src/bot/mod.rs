@@ -1,5 +1,5 @@
 pub mod commands;
-pub mod handler;
+pub mod handlers;
 
 pub struct Data;
 
