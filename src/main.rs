@@ -20,7 +20,7 @@ async fn main() {
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![bot::commands::ask()],
+            commands: vec![bot::commands::ask(), bot::commands::research()],
             event_handler: |ctx, event, framework, data| {
                 bot::handlers::event_handler(ctx, event, framework, data)
             },
@@ -28,7 +28,9 @@ async fn main() {
         })
         .setup(move |ctx, _ready, framework| {
             Box::pin(async move {
+                tracing::info!("Registering commands: {:?}", framework.options().commands.iter().map(|c| &c.name).collect::<Vec<_>>());
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                tracing::info!("Commands registered successfully");
 
                 let is_prod = std::env::var("PROD").unwrap_or_default() != "0";
                 let activity_name = if is_prod {

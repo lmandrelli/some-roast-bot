@@ -1,6 +1,8 @@
-use poise::serenity_prelude::{self as serenity, Mentionable};
+use poise::serenity_prelude::{self as serenity};
+use std::sync::Arc;
 
 use crate::bot::Error;
+use crate::bot::context;
 
 /// Priority 3: Bot tagged alone.
 /// Picks someone from recent channel messages and roasts them.
@@ -13,22 +15,13 @@ pub async fn handle_channel(
         msg.author.name
     );
 
-    let builder = serenity::builder::GetMessages::new()
-        .before(msg.id)
-        .limit(10);
-    let messages = msg.channel_id.messages(&ctx.http, builder).await?;
+    let channel_ctx = context::fetch_channel_context(
+        ctx,
+        msg.channel_id,
+        msg.id,
+        20,
+        true,
+    ).await?;
 
-    let context_messages: Vec<(String, String, String)> = messages
-        .iter()
-        .filter(|m| !m.author.bot)
-        .map(|m| {
-            (
-                m.author.name.clone(),
-                m.author.id.mention().to_string(),
-                m.content.clone(),
-            )
-        })
-        .collect();
-
-    crate::agents::roast_channel(&context_messages).await
+    crate::agents::roast_channel(Arc::new(ctx.clone()), msg.channel_id, &channel_ctx).await
 }

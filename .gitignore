@@ -23,3 +23,6 @@ target/
 
 # bot invite link
 invite.txt
+
+# agent memory db
+data/memory.db

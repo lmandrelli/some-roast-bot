@@ -32,6 +32,7 @@ pub async fn roast_microsoft(
     author: &str,
     author_mention: &str,
     message: &str,
+    channel_ctx: &crate::bot::context::ChannelContext,
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     // Fetch previously used topics from memory
     let past_topics = crate::memory::recent_topics(20);
@@ -47,10 +48,14 @@ pub async fn roast_microsoft(
         format!("Already Used Topics (DO NOT reuse these):\n{list}\n")
     };
 
+    let channel_formatted = channel_ctx.to_string();
+
     let full_preamble = format!("{PREAMBLE}\n{topics_section}\n---\nContext:\n");
 
     let context = format!(
         "{author} ({author_mention}) said: \"{message}\"\n\n\
+         Channel context:\n\
+         {channel_formatted}\n\n\
          They mentioned Microsoft or Windows. Destroy them. \
          Remember: it's \"Microslop\" and \"Windaube\", always. \
          Tag them using their mention: {author_mention}",

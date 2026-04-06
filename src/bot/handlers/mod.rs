@@ -1,4 +1,4 @@
-mod channel;
+pub mod channel;
 mod microsoft;
 mod reply;
 mod truth;
@@ -95,7 +95,7 @@ async fn handle_message(
 ) -> Result<String, Error> {
     // Priority 0a: Message contains Microsoft/Windows keywords (no mention required)
     if has_microsoft {
-        return handle_microsoft(msg).await;
+        return handle_microsoft(ctx, msg).await;
     }
 
     // Priority 3a: Message contains "is this true?" / "is that true?" (no mention required)
@@ -112,7 +112,7 @@ async fn handle_message(
 
     // Priority 1: Bot is tagged in a reply to another message
     if let Some(ref replied_msg) = msg.referenced_message {
-        return handle_reply(msg, replied_msg).await;
+        return handle_reply(ctx, msg, replied_msg).await;
     }
 
     // Priority 2: Bot is tagged alongside another user

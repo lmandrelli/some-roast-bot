@@ -1,6 +1,8 @@
-use poise::serenity_prelude::{self as serenity, Mentionable};
+use poise::serenity_prelude::{self as serenity};
+use std::sync::Arc;
 
 use crate::bot::Error;
+use crate::bot::context;
 
 /// Checks whether a message contains "is this true?" or "is that true?"
 /// (case-insensitive, tolerant of an optional space before the question mark).
@@ -24,22 +26,13 @@ pub async fn handle_truth(
         msg.channel_id
     );
 
-    let builder = serenity::builder::GetMessages::new()
-        .before(msg.id)
-        .limit(10);
-    let messages = msg.channel_id.messages(&ctx.http, builder).await?;
+    let channel_ctx = context::fetch_channel_context(
+        ctx,
+        msg.channel_id,
+        msg.id,
+        20,
+        true,
+    ).await?;
 
-    let context_messages: Vec<(String, String, String)> = messages
-        .iter()
-        .filter(|m| !m.author.bot)
-        .map(|m| {
-            (
-                m.author.name.clone(),
-                m.author.id.mention().to_string(),
-                m.content.clone(),
-            )
-        })
-        .collect();
-
-    crate::agents::roast_truth(&context_messages).await
+    crate::agents::roast_truth(Arc::new(ctx.clone()), msg.channel_id, &channel_ctx).await
 }
