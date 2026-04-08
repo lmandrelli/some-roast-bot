@@ -1,5 +1,6 @@
 pub mod channel;
 mod microsoft;
+mod quoi;
 mod reply;
 mod truth;
 mod user;
@@ -10,6 +11,7 @@ use poise::serenity_prelude::{self as serenity, FullEvent};
 
 pub use channel::handle_channel;
 pub use microsoft::handle_microsoft;
+pub use quoi::handle_quoi;
 pub use reply::handle_reply;
 pub use truth::handle_truth;
 pub use user::handle_user;
@@ -36,7 +38,10 @@ pub fn event_handler<'a>(
                 return Ok(());
             }
 
-            // Priority 0a: Microsoft/Windows keywords (no mention required)
+            // Priority 0a: Ends with "quoi" (no mention required) - instant response
+            let has_quoi = quoi::contains_quoi(&new_message.content);
+
+            // Priority 0b: Microsoft/Windows keywords (no mention required)
             let has_microsoft = microsoft::contains_microsoft_keywords(&new_message.content);
 
             // Priority 3a: "is this true?" / "is that true?" (no mention required)
@@ -46,23 +51,24 @@ pub fn event_handler<'a>(
             let mentions_me: bool = new_message.mentions_me(&ctx.http).await.unwrap_or(false);
 
             // If no passive trigger and bot is not mentioned, ignore the message
-            if !has_microsoft && !has_truth && !mentions_me {
+            if !has_microsoft && !has_quoi && !has_truth && !mentions_me {
                 return Ok(());
             }
 
             tracing::info!(
-                "Handling message from {} in channel {} (mentioned={}, microsoft={}, truth={})",
+                "Handling message from {} in channel {} (mentioned={}, microsoft={}, quoi={}, truth={})",
                 new_message.author.name,
                 new_message.channel_id,
                 mentions_me,
                 has_microsoft,
+                has_quoi,
                 has_truth,
             );
 
             // Show typing indicator while we generate the response
             let typing = new_message.channel_id.start_typing(&ctx.http);
 
-            let result = handle_message(ctx, new_message, mentions_me, has_microsoft, has_truth).await;
+            let result = handle_message(ctx, new_message, mentions_me, has_microsoft, has_quoi, has_truth).await;
 
             // Stop typing
             drop(typing);
@@ -91,9 +97,15 @@ async fn handle_message(
     msg: &serenity::Message,
     mentions_me: bool,
     has_microsoft: bool,
+    has_quoi: bool,
     has_truth: bool,
 ) -> Result<String, Error> {
-    // Priority 0a: Message contains Microsoft/Windows keywords (no mention required)
+    // Priority 0a: Message ends with "quoi" (no mention required)
+    if has_quoi {
+        return handle_quoi(ctx, msg).await;
+    }
+
+    // Priority 0b: Message contains Microsoft/Windows keywords (no mention required)
     if has_microsoft {
         return handle_microsoft(ctx, msg).await;
     }
