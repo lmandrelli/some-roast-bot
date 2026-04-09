@@ -20,7 +20,7 @@ async fn main() {
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![bot::commands::ask(), bot::commands::research()],
+            commands: vec![bot::commands::ask(), bot::commands::research(), bot::commands::stats()],
             event_handler: |ctx, event, framework, data| {
                 bot::handlers::event_handler(ctx, event, framework, data)
             },

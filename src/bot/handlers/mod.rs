@@ -102,11 +102,13 @@ async fn handle_message(
 ) -> Result<String, Error> {
     // Priority 0a: Message ends with "quoi" (no mention required)
     if has_quoi {
+        crate::memory::increment_quoi_feur_count();
         return handle_quoi(ctx, msg).await;
     }
 
     // Priority 0b: Message contains Microsoft/Windows keywords (no mention required)
     if has_microsoft {
+        crate::memory::increment_microsoft_count();
         return handle_microsoft(ctx, msg).await;
     }
 

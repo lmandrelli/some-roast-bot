@@ -24,9 +24,17 @@ pub fn init() {
             id       INTEGER PRIMARY KEY AUTOINCREMENT,
             topic    TEXT    NOT NULL,
             used_at  TEXT    NOT NULL
-        );",
+        );
+
+        CREATE TABLE IF NOT EXISTS stats (
+            id          INTEGER PRIMARY KEY CHECK (id = 1),
+            microsoft   INTEGER NOT NULL DEFAULT 0,
+            quoi_feur   INTEGER NOT NULL DEFAULT 0
+        );
+
+        INSERT OR IGNORE INTO stats (id, microsoft, quoi_feur) VALUES (1, 0, 0);",
     )
-    .expect("failed to create news table");
+    .expect("failed to create tables");
 
     *DB.lock().unwrap() = Some(conn);
     tracing::info!("Memory database initialised at {db_path}");
@@ -57,4 +65,36 @@ pub fn remember_topic(topic: &str) {
         (topic, Utc::now().to_rfc3339()),
     )
     .expect("failed to insert topic");
+}
+
+pub fn increment_microsoft_count() {
+    let guard = DB.lock().unwrap();
+    let conn = guard.as_ref().expect("memory not initialised");
+    conn.execute(
+        "UPDATE stats SET microsoft = microsoft + 1 WHERE id = 1",
+        [],
+    )
+    .expect("failed to increment microsoft count");
+}
+
+pub fn increment_quoi_feur_count() {
+    let guard = DB.lock().unwrap();
+    let conn = guard.as_ref().expect("memory not initialised");
+    conn.execute(
+        "UPDATE stats SET quoi_feur = quoi_feur + 1 WHERE id = 1",
+        [],
+    )
+    .expect("failed to increment quoi_feur count");
+}
+
+pub fn get_stats() -> (i64, i64) {
+    let guard = DB.lock().unwrap();
+    let conn = guard.as_ref().expect("memory not initialised");
+
+    let mut stmt = conn
+        .prepare("SELECT microsoft, quoi_feur FROM stats WHERE id = 1")
+        .expect("failed to prepare query");
+
+    stmt.query_row([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .expect("failed to get stats")
 }
