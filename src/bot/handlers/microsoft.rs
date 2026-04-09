@@ -27,6 +27,7 @@ pub async fn handle_microsoft(ctx: &serenity::Context, msg: &serenity::Message) 
     ).await?;
 
     let clean_content = strip_mentions(&msg.content);
+    crate::memory::record_roast(&msg.author.id.to_string(), Some(&msg.author.id.to_string()), "microsoft");
     crate::agents::roast_microsoft(
         &msg.author.name,
         &msg.author.id.mention().to_string(),

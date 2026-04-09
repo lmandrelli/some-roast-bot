@@ -29,3 +29,12 @@ pub async fn roast_channel(
     let context = format!("{context_str}\n\nPick someone to roast and tag them using their mention.");
     call_model_with_tools(PREAMBLE, &context, ctx, channel_id).await
 }
+
+pub async fn roast_channel_with_context(
+    ctx: Arc<poise::serenity_prelude::Context>,
+    channel_id: poise::serenity_prelude::ChannelId,
+    context: &str,
+) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    let prompt = format!("{context}\n\nPick someone to roast and tag them using their mention.");
+    call_model_with_tools(PREAMBLE, &prompt, ctx, channel_id).await
+}

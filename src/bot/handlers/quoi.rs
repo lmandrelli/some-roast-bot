@@ -29,7 +29,8 @@ pub fn contains_quoi(content: &str) -> bool {
 
 pub async fn handle_quoi(
     _ctx: &serenity::Context,
-    _msg: &serenity::Message,
+    msg: &serenity::Message,
 ) -> Result<String, Error> {
+    crate::memory::record_roast(&msg.author.id.to_string(), None, "quoi");
     Ok("-feur".to_string())
 }

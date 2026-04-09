@@ -34,5 +34,13 @@ pub async fn handle_truth(
         true,
     ).await?;
 
-    crate::agents::roast_truth(Arc::new(ctx.clone()), msg.channel_id, &channel_ctx).await
+    let response = crate::agents::roast_truth(Arc::new(ctx.clone()), msg.channel_id, &channel_ctx).await?;
+
+    if let Some(target_id) = super::channel::extract_mentioned_user(&response) {
+        crate::memory::record_roast(&msg.author.id.to_string(), Some(&target_id), "truth");
+    } else {
+        crate::memory::record_roast(&msg.author.id.to_string(), None, "truth");
+    }
+
+    Ok(response)
 }

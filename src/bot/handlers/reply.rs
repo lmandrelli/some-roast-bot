@@ -27,6 +27,8 @@ pub async fn handle_reply(
         true,
     ).await?;
 
+    crate::memory::record_roast(&msg.author.id.to_string(), Some(&replied_msg.author.id.to_string()), "reply");
+
     let tagger_name = &msg.author.name;
     let tagger_mention = msg.author.id.mention().to_string();
     let tagger_content = strip_mentions(&msg.content);

@@ -4,7 +4,7 @@ mod roast;
 
 pub use ask::ask;
 pub use research::research;
-pub use roast::{roast_channel, roast_microsoft, roast_reply, roast_truth, roast_user};
+pub use roast::{roast_channel, roast_channel_with_context, roast_microsoft, roast_reply, roast_truth, roast_user};
 
 const DEFAULT_MODEL: &str = "moonshotai/Kimi-K2.5-TEE";
 
