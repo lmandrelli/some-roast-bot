@@ -1,5 +1,6 @@
 mod agents;
 mod bot;
+pub mod error;
 pub mod memory;
 
 use bot::Data;

@@ -14,9 +14,10 @@ pub async fn research(
         }
         Err(e) => {
             tracing::error!("Research command failed: {:?}", e);
+            let error_response = crate::error::discord_error_response(&*e);
             ctx.send(
                 poise::CreateReply::default()
-                    .content(format!("**Error:** {}", e))
+                    .content(error_response)
                     .ephemeral(true),
             )
             .await?;
