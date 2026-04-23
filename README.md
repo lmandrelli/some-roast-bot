@@ -1,6 +1,6 @@
 # some-roast-bot
 
-A sarcastic Discord bot that roasts users while answering their questions. Powered by an AI LLM (currently [Kimi K2.5](https://kimi.ai) served by [Chutes AI](https://chutes.ai)) with real-time web search via the [Exa MCP](https://exa.ai) server. All responses are in French.
+A sarcastic Discord bot that roasts users while answering their questions. Powered by an AI LLM (currently [Kimi K2.6](https://kimi.ai) served by [Chutes AI](https://chutes.ai)) with real-time web search via the [Exa MCP](https://exa.ai) server. All responses are in French.
 
 ---
 
