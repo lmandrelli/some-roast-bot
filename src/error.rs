@@ -6,6 +6,7 @@ pub enum ChutesErrorType {
     OutOfTokens,
     ServerOutOfCapacity,
     BadAuthentication,
+    EmptyResponse,
     Other,
 }
 
@@ -21,6 +22,9 @@ impl ChutesErrorType {
             ChutesErrorType::BadAuthentication => {
                 "https://tenor.com/view/let-me-in-eric-andre-wanna-come-in-gif-13730108"
             }
+            ChutesErrorType::EmptyResponse => {
+                "https://tenor.com/view/empty-inside-empty-sad-depression-meme-gif-12191495715687738667"
+            }
             ChutesErrorType::Other => {
                 "https://tenor.com/view/windows-crash-dialog-error-message-popups-many-endless-flood-bsod-microsoft-windows-error-dialog-endless-crashing-blue-screen-of-death-gif-1753725196792798674"
             }
@@ -32,6 +36,7 @@ impl ChutesErrorType {
             ChutesErrorType::OutOfTokens => "Oh non, j'ai plus de tokens ! Même mon cerveau artificiel fait faillite...",
             ChutesErrorType::ServerOutOfCapacity => "Les serveurs sont saturés... Même Chutes a besoin d'une pause café.",
             ChutesErrorType::BadAuthentication => "Problème d'authentification... Laisse-moi entrer, j'ai perdu mes clés !",
+            ChutesErrorType::EmptyResponse => "L'IA est partie en couille et a répondu... rien. Complètement vide à l'intérieur.",
             ChutesErrorType::Other => "Oups, quelque chose s'est mal passé ! Même Windows fait moins d'erreurs que ça...",
         }
     }
@@ -82,6 +87,14 @@ pub fn classify_chutes_error(error: &dyn std::error::Error) -> ChutesErrorType {
             || lower.contains("authentication_error")
         {
             return ChutesErrorType::BadAuthentication;
+        }
+
+        // Empty LLM response (no message or tool call)
+        if msg.contains("no message or tool call")
+            || msg.contains("response contained no message")
+            || lower.contains("empty")
+        {
+            return ChutesErrorType::EmptyResponse;
         }
 
         current = err.source();
