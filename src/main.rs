@@ -1,6 +1,8 @@
 mod agents;
 mod bot;
+pub mod fixers;
 pub mod memory;
+pub mod models;
 
 use bot::Data;
 use dotenv::dotenv;
@@ -20,7 +22,12 @@ async fn main() {
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![bot::commands::ask(), bot::commands::research(), bot::commands::stats()],
+            commands: vec![
+    bot::commands::ask(),
+    bot::commands::fix(),
+    bot::commands::research(),
+    bot::commands::stats()
+],
             event_handler: |ctx, event, framework, data| {
                 bot::handlers::event_handler(ctx, event, framework, data)
             },

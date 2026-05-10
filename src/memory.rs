@@ -41,6 +41,13 @@ pub fn init() {
             roast_type   TEXT NOT NULL,
             count        INTEGER NOT NULL DEFAULT 1,
             UNIQUE(triggerer_id, target_id, roast_type)
+        );
+
+        CREATE TABLE IF NOT EXISTS link_fix_replies (
+            original_message_id TEXT PRIMARY KEY,
+            bot_reply_id        TEXT NOT NULL,
+            channel_id          TEXT NOT NULL,
+            created_at          INTEGER NOT NULL
         );",
     )
     .expect("failed to create tables");
@@ -173,4 +180,50 @@ pub fn get_roast_count(roast_type: &str) -> i64 {
 
     stmt.query_row([roast_type], |row| row.get(0))
         .expect("failed to get roast count")
+}
+
+/* ------------------------------------------------------------------ */
+/* Link-fix reply persistence (for edit tracking)                     */
+/* ------------------------------------------------------------------ */
+
+pub fn store_link_fix_reply(original_msg_id: &str, bot_reply_id: &str, channel_id: &str) {
+    let guard = DB.lock().unwrap();
+    let conn = guard.as_ref().expect("memory not initialised");
+
+    conn.execute(
+        "INSERT INTO link_fix_replies (original_message_id, bot_reply_id, channel_id, created_at)
+         VALUES (?1, ?2, ?3, ?4)
+         ON CONFLICT(original_message_id) DO UPDATE SET
+             bot_reply_id = excluded.bot_reply_id,
+             channel_id   = excluded.channel_id,
+             created_at   = excluded.created_at",
+        (original_msg_id, bot_reply_id, channel_id, chrono::Utc::now().timestamp()),
+    )
+    .expect("failed to store link-fix reply");
+}
+
+pub fn get_link_fix_reply(original_msg_id: &str) -> Option<poise::serenity_prelude::MessageId> {
+    let guard = DB.lock().unwrap();
+    let conn = guard.as_ref().expect("memory not initialised");
+
+    let mut stmt = conn
+        .prepare("SELECT bot_reply_id FROM link_fix_replies WHERE original_message_id = ?1")
+        .expect("failed to prepare query");
+
+    let reply_id_str: Option<String> = stmt
+        .query_row([original_msg_id], |row| row.get(0))
+        .ok();
+
+    reply_id_str.and_then(|s| s.parse::<u64>().ok().map(poise::serenity_prelude::MessageId::new))
+}
+
+pub fn remove_link_fix_reply(original_msg_id: &str) {
+    let guard = DB.lock().unwrap();
+    let conn = guard.as_ref().expect("memory not initialised");
+
+    conn.execute(
+        "DELETE FROM link_fix_replies WHERE original_message_id = ?1",
+        [original_msg_id],
+    )
+    .expect("failed to remove link-fix reply");
 }

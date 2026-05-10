@@ -6,10 +6,12 @@ authors = ["Luca Mandrelli <luca.mandrelli@icloud.com>"]
 
 [dependencies]
 poise = { version = "0.6.1" }
-serenity = { version = "0.12" }
+serenity = { version = "0.12", default-features = false, features = ["builder", "cache", "client", "framework", "gateway", "http", "model", "utils", "rustls_backend"] }
 tokio = { version = "1.50", features = ["rt-multi-thread", "macros"] }
 dotenv = "0.15"
 regex = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+url = "2.5"
 futures-util = "0.3"
 rig-core = { version = "0.32", features = ["rmcp"] }
 rmcp = { version = "0.16", features = ["client", "macros", "transport-streamable-http-client-reqwest"] }
