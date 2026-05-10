@@ -197,7 +197,12 @@ pub fn store_link_fix_reply(original_msg_id: &str, bot_reply_id: &str, channel_i
              bot_reply_id = excluded.bot_reply_id,
              channel_id   = excluded.channel_id,
              created_at   = excluded.created_at",
-        (original_msg_id, bot_reply_id, channel_id, chrono::Utc::now().timestamp()),
+        (
+            original_msg_id,
+            bot_reply_id,
+            channel_id,
+            chrono::Utc::now().timestamp(),
+        ),
     )
     .expect("failed to store link-fix reply");
 }
@@ -210,11 +215,13 @@ pub fn get_link_fix_reply(original_msg_id: &str) -> Option<poise::serenity_prelu
         .prepare("SELECT bot_reply_id FROM link_fix_replies WHERE original_message_id = ?1")
         .expect("failed to prepare query");
 
-    let reply_id_str: Option<String> = stmt
-        .query_row([original_msg_id], |row| row.get(0))
-        .ok();
+    let reply_id_str: Option<String> = stmt.query_row([original_msg_id], |row| row.get(0)).ok();
 
-    reply_id_str.and_then(|s| s.parse::<u64>().ok().map(poise::serenity_prelude::MessageId::new))
+    reply_id_str.and_then(|s| {
+        s.parse::<u64>()
+            .ok()
+            .map(poise::serenity_prelude::MessageId::new)
+    })
 }
 
 pub fn remove_link_fix_reply(original_msg_id: &str) {

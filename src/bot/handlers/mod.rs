@@ -34,7 +34,11 @@ pub fn event_handler<'a>(
 ) -> BoxFuture<'a, Result<(), Error>> {
     Box::pin(async move {
         // Handle message edits (link-fix replies must stay in sync)
-        if let FullEvent::MessageUpdate { event: update_event, .. } = event {
+        if let FullEvent::MessageUpdate {
+            event: update_event,
+            ..
+        } = event
+        {
             if let Err(e) = social_link::handle_message_update(ctx, update_event).await {
                 tracing::warn!("Link-fix edit handler failed: {}", e);
             }
@@ -50,7 +54,7 @@ pub fn event_handler<'a>(
             // Priority 0d: Social media links (fast, deterministic, no mention required)
             match social_link::handle_social_links(ctx, new_message).await {
                 Ok(true) => return Ok(()), // handled — skip AI roasts
-                Ok(false) => {} // no links found, continue
+                Ok(false) => {}            // no links found, continue
                 Err(e) => {
                     tracing::warn!("Social link handler failed: {}", e);
                 }
@@ -86,7 +90,15 @@ pub fn event_handler<'a>(
             // Show typing indicator while we generate the response
             let typing = new_message.channel_id.start_typing(&ctx.http);
 
-            let result = handle_message(ctx, new_message, mentions_me, has_microsoft, has_quoi, has_truth).await;
+            let result = handle_message(
+                ctx,
+                new_message,
+                mentions_me,
+                has_microsoft,
+                has_quoi,
+                has_truth,
+            )
+            .await;
 
             // Stop typing
             drop(typing);
@@ -100,7 +112,10 @@ pub fn event_handler<'a>(
                 Err(e) => {
                     tracing::error!("Roast failed: {:?}", e);
                     new_message
-                        .reply(&ctx.http, "Even I can't roast this situation... something broke.")
+                        .reply(
+                            &ctx.http,
+                            "Even I can't roast this situation... something broke.",
+                        )
                         .await?;
                 }
             }

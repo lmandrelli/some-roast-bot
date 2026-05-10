@@ -18,12 +18,12 @@ pub async fn handle_social_links(
     // Suppress the ugly original embeds on the user's message.
     // This requires the *Manage Messages* permission.
     let suppress_edit = serenity::EditMessage::new().suppress_embeds(true);
-    if let Err(e) = msg.channel_id.edit_message(&ctx.http, msg.id, suppress_edit).await {
-        tracing::warn!(
-            "Failed to suppress embeds for msg {}: {}",
-            msg.id,
-            e
-        );
+    if let Err(e) = msg
+        .channel_id
+        .edit_message(&ctx.http, msg.id, suppress_edit)
+        .await
+    {
+        tracing::warn!("Failed to suppress embeds for msg {}: {}", msg.id, e);
     }
 
     let urls = fixed
@@ -44,11 +44,7 @@ pub async fn handle_social_links(
     );
 
     // Stats
-    crate::memory::record_roast(
-        &msg.author.id.to_string(),
-        None,
-        "social_link",
-    );
+    crate::memory::record_roast(&msg.author.id.to_string(), None, "social_link");
 
     Ok(true)
 }
@@ -96,10 +92,7 @@ pub async fn handle_message_update(
         .unwrap_or_else(|| "Someone".to_string());
 
     let now = chrono::Utc::now().format("%H:%M:%S");
-    let new_text = format!(
-        "{} posted: {} (modified at: {})",
-        author_name, urls, now
-    );
+    let new_text = format!("{} posted: {} (modified at: {})", author_name, urls, now);
 
     let edit = serenity::EditMessage::new().content(new_text);
     if let Err(e) = channel_id.edit_message(&ctx.http, bot_reply_id, edit).await {

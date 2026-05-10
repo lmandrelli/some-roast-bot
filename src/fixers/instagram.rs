@@ -6,8 +6,9 @@ static FIX_BASE: &str = "https://vxinstagram.com";
 /// Extract Instagram links and rewrite them to vxinstagram.com.
 pub fn fix(text: &str) -> Vec<FixedLink> {
     let re = Regex::new(
-        r#"https?://(?:www\.)?(?:instagram\.com/(p|reel|tv)/([\w-]+)|instagr\.am/p/([\w-]+))"#
-    ).unwrap();
+        r#"https?://(?:www\.)?(?:instagram\.com/(p|reel|tv)/([\w-]+)|instagr\.am/p/([\w-]+))"#,
+    )
+    .unwrap();
 
     let mut results = Vec::new();
 

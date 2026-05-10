@@ -82,8 +82,6 @@ cp .env.example .env
 | `MODEL_NAME`     | LLM model identifier                                   | `moonshotai/Kimi-K2.5-TEE`     |
 | `PROD`           | Production flag (`1` = prod, `0` = dev status display)  | `1`                             |
 | `MEMORY_DB_PATH` | Path to the SQLite memory database                      | `data/memory.db`                |
-| `FXTWITTER_API_BASE` | Base URL for FxEmbed Twitter API                   | `https://api.fxtwitter.com`    |
-| `FXBSKY_API_BASE`    | Base URL for FxEmbed Bluesky API                   | `https://api.fxbsky.app`       |
 
 > **Note:** The bot reads these variables at startup via [`dotenv`](https://crates.io/crates/dotenv). Never commit your `.env` file.
 

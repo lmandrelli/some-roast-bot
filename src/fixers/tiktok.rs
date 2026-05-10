@@ -5,9 +5,7 @@ static FIX_BASE: &str = "https://tnktok.com";
 
 /// Extract TikTok links and rewrite them to tnktok.com.
 pub fn fix(text: &str) -> Vec<FixedLink> {
-    let re = Regex::new(
-        r#"https?://(?:www\.)?tiktok\.com/@([\w.\-]+)/video/(\d+)"#
-    ).unwrap();
+    let re = Regex::new(r#"https?://(?:www\.)?tiktok\.com/@([\w.\-]+)/video/(\d+)"#).unwrap();
 
     let mut results = Vec::new();
 

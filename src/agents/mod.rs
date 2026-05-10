@@ -4,7 +4,10 @@ mod roast;
 
 pub use ask::ask;
 pub use research::research;
-pub use roast::{roast_channel, roast_channel_with_context, roast_microsoft, roast_reply, roast_truth, roast_user};
+pub use roast::{
+    roast_channel, roast_channel_with_context, roast_microsoft, roast_reply, roast_truth,
+    roast_user,
+};
 
 const DEFAULT_MODEL: &str = "moonshotai/Kimi-K2.5-TEE";
 
@@ -12,4 +15,3 @@ const DEFAULT_MODEL: &str = "moonshotai/Kimi-K2.5-TEE";
 pub(crate) fn model_name() -> String {
     std::env::var("MODEL_NAME").unwrap_or_else(|_| DEFAULT_MODEL.to_string())
 }
-

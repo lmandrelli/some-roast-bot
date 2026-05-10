@@ -92,7 +92,10 @@ pub async fn roast_microsoft(
         .max_turns(5)
         .await
         .inspect_err(|e| tracing::error!("Microsoft roast completion error: {:?}", e))?;
-    tracing::info!("Microsoft roast response received: {} chars", response.len());
+    tracing::info!(
+        "Microsoft roast response received: {} chars",
+        response.len()
+    );
 
     // Extract and store the topic from the [TOPIC: ...] tag
     let (clean_response, topic) = extract_topic(&response);

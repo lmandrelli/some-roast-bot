@@ -41,10 +41,7 @@ pub async fn fix_links(text: &str) -> Vec<FixedLink> {
     let mut results = Vec::new();
 
     // Platforms that need an async API call (concurrent)
-    let (twitter_res, bluesky_res) = tokio::join!(
-        twitter::fix(text),
-        bluesky::fix(text),
-    );
+    let (twitter_res, bluesky_res) = tokio::join!(twitter::fix(text), bluesky::fix(text),);
     results.extend(twitter_res);
     results.extend(bluesky_res);
 

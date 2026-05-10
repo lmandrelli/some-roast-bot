@@ -7,9 +7,8 @@ static FIX_BASE: &str = "https://fxtwitter.com";
 
 /// Extract Twitter/X links and rewrite them with smart translation.
 pub async fn fix(text: &str) -> Vec<FixedLink> {
-    let re = Regex::new(
-        r#"https?://(?:www\.)?(?:twitter\.com|x\.com)/([\w_]+)/status/(\d+)"#
-    ).unwrap();
+    let re =
+        Regex::new(r#"https?://(?:www\.)?(?:twitter\.com|x\.com)/([\w_]+)/status/(\d+)"#).unwrap();
 
     let mut results = Vec::new();
 
@@ -20,12 +19,11 @@ pub async fn fix(text: &str) -> Vec<FixedLink> {
 
         let api_url = format!("{}/{}/status/{}", API_BASE, user, tweet_id);
         let (fixed_url, translated) = match fetch_lang(&api_url).await {
-            Some(lang) if should_translate(Some(&lang)) => {
-                (format!("{}/{}/status/{}/fr", FIX_BASE, user, tweet_id), true)
-            }
-            _ => {
-                (format!("{}/{}/status/{}", FIX_BASE, user, tweet_id), false)
-            }
+            Some(lang) if should_translate(Some(&lang)) => (
+                format!("{}/{}/status/{}/fr", FIX_BASE, user, tweet_id),
+                true,
+            ),
+            _ => (format!("{}/{}/status/{}", FIX_BASE, user, tweet_id), false),
         };
 
         results.push(FixedLink {

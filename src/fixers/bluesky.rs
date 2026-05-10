@@ -7,9 +7,7 @@ static FIX_BASE: &str = "https://fxbsky.app";
 
 /// Extract Bluesky links and rewrite them with smart translation.
 pub async fn fix(text: &str) -> Vec<FixedLink> {
-    let re = Regex::new(
-        r#"https?://(?:www\.)?bsky\.app/profile/([\w.\-]+)/post/([\w]+)"#
-    ).unwrap();
+    let re = Regex::new(r#"https?://(?:www\.)?bsky\.app/profile/([\w.\-]+)/post/([\w]+)"#).unwrap();
 
     let mut results = Vec::new();
 
@@ -20,12 +18,14 @@ pub async fn fix(text: &str) -> Vec<FixedLink> {
 
         let api_url = format!("{}/profile/{}/post/{}", API_BASE, handle, rkey);
         let (fixed_url, translated) = match fetch_lang(&api_url).await {
-            Some(lang) if should_translate(Some(&lang)) => {
-                (format!("{}/profile/{}/post/{}/fr", FIX_BASE, handle, rkey), true)
-            }
-            _ => {
-                (format!("{}/profile/{}/post/{}", FIX_BASE, handle, rkey), false)
-            }
+            Some(lang) if should_translate(Some(&lang)) => (
+                format!("{}/profile/{}/post/{}/fr", FIX_BASE, handle, rkey),
+                true,
+            ),
+            _ => (
+                format!("{}/profile/{}/post/{}", FIX_BASE, handle, rkey),
+                false,
+            ),
         };
 
         results.push(FixedLink {

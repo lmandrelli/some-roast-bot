@@ -5,13 +5,10 @@ static FIX_BASE: &str = "https://rxddit.com";
 
 /// Extract Reddit links and rewrite them to rxddit.com.
 pub fn fix(text: &str) -> Vec<FixedLink> {
-    let re_long = Regex::new(
-        r#"https?://(?:www\.)?reddit\.com/r/(\w+)/comments/(\w+)(?:/\w+)?"#
-    ).unwrap();
+    let re_long =
+        Regex::new(r#"https?://(?:www\.)?reddit\.com/r/(\w+)/comments/(\w+)(?:/\w+)?"#).unwrap();
 
-    let re_short = Regex::new(
-        r#"https?://(?:www\.)?redd\.it/(\w+)"#
-    ).unwrap();
+    let re_short = Regex::new(r#"https?://(?:www\.)?redd\.it/(\w+)"#).unwrap();
 
     let mut results = Vec::new();
 

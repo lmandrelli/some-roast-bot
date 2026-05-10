@@ -1,16 +1,16 @@
 [package]
 name = "some-roast-bot"
-version = "0.1.7"
+version = "0.2.0"
 edition = "2024"
 authors = ["Luca Mandrelli <luca.mandrelli@icloud.com>"]
 
 [dependencies]
 poise = { version = "0.6.1" }
-serenity = { version = "0.12", default-features = false, features = ["builder", "cache", "client", "framework", "gateway", "http", "model", "utils", "rustls_backend"] }
+serenity = { version = "0.12" }
 tokio = { version = "1.50", features = ["rt-multi-thread", "macros"] }
 dotenv = "0.15"
 regex = "1"
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", features = ["json"] }
 url = "2.5"
 futures-util = "0.3"
 rig-core = { version = "0.32", features = ["rmcp"] }

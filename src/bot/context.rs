@@ -100,9 +100,10 @@ pub async fn fetch_channel_context(
         .iter()
         .filter(|m| !filter_bot || !m.author.bot)
         .map(|m| {
-            let reply_to = m.referenced_message.as_ref().map(|ref_msg| {
-                ref_msg.author.name.clone()
-            });
+            let reply_to = m
+                .referenced_message
+                .as_ref()
+                .map(|ref_msg| ref_msg.author.name.clone());
 
             FormattedMessage {
                 timestamp: m.timestamp,
@@ -146,7 +147,10 @@ pub async fn fetch_user_context(
             timestamp: m.timestamp,
             author_name: m.author.name.clone(),
             content: m.content.clone(),
-            reply_to: m.referenced_message.as_ref().map(|ref_msg| ref_msg.author.name.clone()),
+            reply_to: m
+                .referenced_message
+                .as_ref()
+                .map(|ref_msg| ref_msg.author.name.clone()),
         })
         .collect();
 
@@ -157,7 +161,10 @@ pub async fn fetch_user_context(
             timestamp: m.timestamp,
             author_name: m.author.name.clone(),
             content: m.content.clone(),
-            reply_to: m.referenced_message.as_ref().map(|ref_msg| ref_msg.author.name.clone()),
+            reply_to: m
+                .referenced_message
+                .as_ref()
+                .map(|ref_msg| ref_msg.author.name.clone()),
         })
         .collect();
 
@@ -185,7 +192,11 @@ fn split_into_threads(messages: &[FormattedMessage]) -> Vec<ConversationThread> 
         let prev = &window[0];
         let next = &window[1];
 
-        let gap = match next.timestamp.signed_duration_since(*prev.timestamp).num_seconds() {
+        let gap = match next
+            .timestamp
+            .signed_duration_since(*prev.timestamp)
+            .num_seconds()
+        {
             secs if secs > 0 => Duration::from_secs(secs as u64),
             _ => Duration::ZERO,
         };
