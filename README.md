@@ -22,9 +22,12 @@ A sarcastic Discord bot that roasts users while answering their questions. Power
 ### Slash Command
 
 - **`/ask <question>`** — Asks the AI a question. The agent searches the web via Exa MCP, then responds with a sarcastic roast that also contains the actual answer.
+- **`/fix <url>`** — Manually fix a social media link and get the embed-friendly version back.
+- **`/stats`** — Show usage statistics for all bot features (roasts, social links, etc.).
 
 ### Passive Triggers (no mention required)
 
+- **Social Media Embed Fixer** — Automatically detects Twitter/X, Bluesky, Instagram, Reddit, and TikTok links. Suppresses the original broken/paywalled embed and replies with a fixed embed-friendly URL. For Twitter/X and Bluesky, it intelligently translates non-English/French posts to French via the FxEmbed API.
 - **Microsoft/Windows Auto-Roast** — Whenever anyone mentions "Microsoft" or "Windows", the bot automatically searches for the latest Microsoft fails/bugs and roasts them. Uses a SQLite memory to avoid repeating topics. Refers to Microsoft as "Microslop" and Windows as "Windaube".
 - **"Is this true?" Detector** — Detects phrases like "is this true?" or "is that true?", reads recent channel messages, and judges whether the claim is true, false, or nonsense — roast-style.
 
@@ -93,6 +96,8 @@ cargo run --release
 
 Once running, invite the bot to your server using the OAuth2 URL, then:
 
+- Post a Twitter/X, Bluesky, Instagram, Reddit, or TikTok link — the bot will automatically fix it
+- Type `/fix <url>` to manually fix a social media link
 - Type `/ask` in any channel the bot has access to
 - Mention the bot (with or without tagging another user) to trigger a roast
 - Reply to a message and tag the bot to have it settle an argument
@@ -105,7 +110,16 @@ Once running, invite the bot to your server using the OAuth2 URL, then:
 ```
 src/
 ├── main.rs              # Startup wiring: env, framework, bot launch
-├── memory.rs            # SQLite-backed topic deduplication memory
+├── memory.rs            # SQLite-backed topic deduplication + link-fix reply tracking
+├── models/
+│   └── fxtwitter.rs     # FxEmbed API response structs
+├── fixers/
+│   ├── mod.rs           # Link extraction orchestrator
+│   ├── twitter.rs       # Twitter/X detection + smart translation
+│   ├── bluesky.rs       # Bluesky detection + smart translation
+│   ├── instagram.rs     # Instagram → vxinstagram.com
+│   ├── reddit.rs        # Reddit → rxddit.com
+│   └── tiktok.rs        # TikTok → tnktok.com
 ├── agents/
 │   ├── mod.rs           # Re-exports + model_name() helper
 │   ├── ask.rs           # /ask agent: MCP + LLM with web search
@@ -120,14 +134,17 @@ src/
     ├── mod.rs           # Shared types (Data, Error, Context)
     ├── commands/
     │   ├── mod.rs       # Re-exports
-    │   └── ask.rs       # /ask slash command handler
+    │   ├── ask.rs       # /ask slash command handler
+    │   ├── fix.rs       # /fix slash command handler
+    │   └── stats.rs     # /stats slash command handler
     └── handlers/
         ├── mod.rs       # Event handler + priority dispatch logic
         ├── channel.rs   # Channel roast handler
         ├── user.rs      # Targeted user roast handler
         ├── reply.rs     # Reply-chain roast handler
         ├── truth.rs     # Truth-check handler
-        └── microsoft.rs # Microsoft/Windows keyword detector
+        ├── microsoft.rs # Microsoft/Windows keyword detector
+        └── social_link.rs # Social media link fixer + edit tracking
 ```
 
 **Key components:**
@@ -140,8 +157,10 @@ src/
 **Design notes:**
 
 - **Stateless agents** — Each request cold-starts a new MCP connection and rig agent. Everything is dropped when the call completes, so there is no shared state or long-lived connection to manage.
-- **Priority-based dispatch** — Event handlers are checked in order: Microsoft keywords > truth questions > reply roast > user roast > channel roast.
-- **Separation of concerns** — `agents/` contains pure async LLM logic (no Discord awareness). `bot/` handles all Discord interaction. The AI logic could be reused outside of Discord.
+- **Priority-based dispatch** — Event handlers are checked in order: Social media links > Microsoft keywords > truth questions > reply roast > user roast > channel roast.
+- **Smart translation** — Twitter/X and Bluesky links are translated to French only when the detected language is neither English nor French, using the FxEmbed API.
+- **Edit tracking** — The bot remembers which messages it fixed. If the user edits their message, the bot updates or deletes its reply accordingly.
+- **Separation of concerns** — `agents/` contains pure async LLM logic (no Discord awareness). `bot/` handles all Discord interaction. `fixers/` handles link detection and rewriting independently.
 
 ---
 

@@ -25,6 +25,7 @@ fn format_stats() -> (String, String) {
         ("truth", "is this true?"),
         ("microsoft", "Microslop Windaube Copyslop Premium"),
         ("quoi", "Quoi ? -feur (ça fait coiffeur mdr)"),
+        ("social_link", "Liens sociaux fixés"),
     ];
 
     let mut content = String::new();

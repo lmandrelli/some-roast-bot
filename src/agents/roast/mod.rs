@@ -26,10 +26,7 @@ async fn call_model_with_tools(
     let openai_client = CompletionsClient::from_env();
     let model = openai_client.completion_model(&model_name);
 
-    let fetch_tool = tools::FetchMessagesTool {
-        ctx,
-        channel_id,
-    };
+    let fetch_tool = tools::FetchMessagesTool { ctx, channel_id };
 
     let agent = rig::agent::AgentBuilder::new(model)
         .preamble(preamble)

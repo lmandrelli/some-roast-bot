@@ -26,6 +26,8 @@ pub async fn roast_truth(
     channel_ctx: &crate::bot::context::ChannelContext,
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     let context_str = channel_ctx.to_string();
-    let context = format!("{context_str}\n\nSomeone asked \"is this true?\". Judge the claim and roast accordingly.");
+    let context = format!(
+        "{context_str}\n\nSomeone asked \"is this true?\". Judge the claim and roast accordingly."
+    );
     call_model_with_tools(PREAMBLE, &context, ctx, channel_id).await
 }

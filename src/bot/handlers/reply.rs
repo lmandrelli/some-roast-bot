@@ -19,15 +19,13 @@ pub async fn handle_reply(
         replied_msg.author.name
     );
 
-    let channel_ctx = context::fetch_channel_context(
-        ctx,
-        msg.channel_id,
-        msg.id,
-        10,
-        true,
-    ).await?;
+    let channel_ctx = context::fetch_channel_context(ctx, msg.channel_id, msg.id, 10, true).await?;
 
-    crate::memory::record_roast(&msg.author.id.to_string(), Some(&replied_msg.author.id.to_string()), "reply");
+    crate::memory::record_roast(
+        &msg.author.id.to_string(),
+        Some(&replied_msg.author.id.to_string()),
+        "reply",
+    );
 
     let tagger_name = &msg.author.name;
     let tagger_mention = msg.author.id.mention().to_string();

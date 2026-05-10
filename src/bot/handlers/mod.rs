@@ -2,6 +2,7 @@ pub mod channel;
 mod microsoft;
 mod quoi;
 mod reply;
+pub mod social_link;
 mod truth;
 mod user;
 
@@ -32,10 +33,31 @@ pub fn event_handler<'a>(
     _data: &'a Data,
 ) -> BoxFuture<'a, Result<(), Error>> {
     Box::pin(async move {
+        // Handle message edits (link-fix replies must stay in sync)
+        if let FullEvent::MessageUpdate {
+            event: update_event,
+            ..
+        } = event
+        {
+            if let Err(e) = social_link::handle_message_update(ctx, update_event).await {
+                tracing::warn!("Link-fix edit handler failed: {}", e);
+            }
+            return Ok(());
+        }
+
         if let FullEvent::Message { new_message } = event {
             // Ignore messages from bots to avoid loops
             if new_message.author.bot {
                 return Ok(());
+            }
+
+            // Priority 0d: Social media links (fast, deterministic, no mention required)
+            match social_link::handle_social_links(ctx, new_message).await {
+                Ok(true) => return Ok(()), // handled — skip AI roasts
+                Ok(false) => {}            // no links found, continue
+                Err(e) => {
+                    tracing::warn!("Social link handler failed: {}", e);
+                }
             }
 
             // Priority 0a: Ends with "quoi" (no mention required) - instant response
@@ -68,7 +90,15 @@ pub fn event_handler<'a>(
             // Show typing indicator while we generate the response
             let typing = new_message.channel_id.start_typing(&ctx.http);
 
-            let result = handle_message(ctx, new_message, mentions_me, has_microsoft, has_quoi, has_truth).await;
+            let result = handle_message(
+                ctx,
+                new_message,
+                mentions_me,
+                has_microsoft,
+                has_quoi,
+                has_truth,
+            )
+            .await;
 
             // Stop typing
             drop(typing);
@@ -82,9 +112,7 @@ pub fn event_handler<'a>(
                 Err(e) => {
                     tracing::error!("Roast failed: {:?}", e);
                     let error_response = crate::error::discord_error_response(&*e);
-                    new_message
-                        .reply(&ctx.http, &error_response)
-                        .await?;
+                    new_message.reply(&ctx.http, &error_response).await?;
                 }
             }
         }

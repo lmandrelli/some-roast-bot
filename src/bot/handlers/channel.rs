@@ -14,21 +14,13 @@ pub async fn handle_channel(
     ctx: &serenity::Context,
     msg: &serenity::Message,
 ) -> Result<String, Error> {
-    tracing::info!(
-        "Priority 3: Channel roast triggered by {}",
-        msg.author.name
-    );
+    tracing::info!("Priority 3: Channel roast triggered by {}", msg.author.name);
 
     let triggerer_id = msg.author.id.to_string();
-    let channel_ctx = context::fetch_channel_context(
-        ctx,
-        msg.channel_id,
-        msg.id,
-        20,
-        true,
-    ).await?;
+    let channel_ctx = context::fetch_channel_context(ctx, msg.channel_id, msg.id, 20, true).await?;
 
-    let mut response = crate::agents::roast_channel(Arc::new(ctx.clone()), msg.channel_id, &channel_ctx).await?;
+    let mut response =
+        crate::agents::roast_channel(Arc::new(ctx.clone()), msg.channel_id, &channel_ctx).await?;
 
     for _ in 0..3 {
         if let Some(target_id) = extract_mentioned_user(&response) {
@@ -42,7 +34,12 @@ pub async fn handle_channel(
             "{}\n\nTu as mentionné la mauvaise personne. Choisis quelqu'un d'autre que <@{triggerer_id}> cette fois.",
             channel_ctx.to_string()
         );
-        response = crate::agents::roast_channel_with_context(Arc::new(ctx.clone()), msg.channel_id, &retry_context).await?;
+        response = crate::agents::roast_channel_with_context(
+            Arc::new(ctx.clone()),
+            msg.channel_id,
+            &retry_context,
+        )
+        .await?;
     }
 
     if let Some(target_id) = extract_mentioned_user(&response) {

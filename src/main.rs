@@ -1,7 +1,9 @@
 mod agents;
 mod bot;
 pub mod error;
+pub mod fixers;
 pub mod memory;
+pub mod models;
 
 use bot::Data;
 use dotenv::dotenv;
@@ -16,12 +18,17 @@ async fn main() {
     memory::init();
 
     let token = std::env::var("DISCORD_TOKEN").expect("missing DISCORD_TOKEN");
-    let intents = serenity::GatewayIntents::non_privileged()
-        | serenity::GatewayIntents::MESSAGE_CONTENT;
+    let intents =
+        serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT;
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![bot::commands::ask(), bot::commands::research(), bot::commands::stats()],
+            commands: vec![
+                bot::commands::ask(),
+                bot::commands::fix(),
+                bot::commands::research(),
+                bot::commands::stats(),
+            ],
             event_handler: |ctx, event, framework, data| {
                 bot::handlers::event_handler(ctx, event, framework, data)
             },
@@ -29,7 +36,15 @@ async fn main() {
         })
         .setup(move |ctx, _ready, framework| {
             Box::pin(async move {
-                tracing::info!("Registering commands: {:?}", framework.options().commands.iter().map(|c| &c.name).collect::<Vec<_>>());
+                tracing::info!(
+                    "Registering commands: {:?}",
+                    framework
+                        .options()
+                        .commands
+                        .iter()
+                        .map(|c| &c.name)
+                        .collect::<Vec<_>>()
+                );
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                 tracing::info!("Commands registered successfully");
 

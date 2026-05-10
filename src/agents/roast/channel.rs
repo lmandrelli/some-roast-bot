@@ -26,7 +26,8 @@ pub async fn roast_channel(
     channel_ctx: &crate::bot::context::ChannelContext,
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     let context_str = channel_ctx.to_string();
-    let context = format!("{context_str}\n\nPick someone to roast and tag them using their mention.");
+    let context =
+        format!("{context_str}\n\nPick someone to roast and tag them using their mention.");
     call_model_with_tools(PREAMBLE, &context, ctx, channel_id).await
 }
 
