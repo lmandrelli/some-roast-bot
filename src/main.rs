@@ -1,5 +1,6 @@
 mod agents;
 mod bot;
+pub mod error;
 pub mod fixers;
 pub mod memory;
 pub mod models;

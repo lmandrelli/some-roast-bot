@@ -111,12 +111,8 @@ pub fn event_handler<'a>(
                 }
                 Err(e) => {
                     tracing::error!("Roast failed: {:?}", e);
-                    new_message
-                        .reply(
-                            &ctx.http,
-                            "Even I can't roast this situation... something broke.",
-                        )
-                        .await?;
+                    let error_response = crate::error::discord_error_response(&*e);
+                    new_message.reply(&ctx.http, &error_response).await?;
                 }
             }
         }
