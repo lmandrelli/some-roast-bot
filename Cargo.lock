@@ -2268,7 +2268,7 @@ dependencies = [
 
 [[package]]
 name = "some-roast-bot"
-version = "0.1.7"
+version = "0.1.9"
 dependencies = [
  "chrono",
  "dotenv",
