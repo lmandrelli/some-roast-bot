@@ -10,13 +10,14 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-and-deploy:
+  build:
+    name: Build and Push Image
     runs-on: ubuntu-latest
-
     permissions:
       contents: read
       packages: write
-
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -55,12 +56,36 @@ jobs:
           provenance: false
           sbom: false
 
+      - name: Extract version tag
+        id: version
+        run: |
+          # github.ref_name for tags like v0.2.1 -> strip leading 'v' to get 0.2.1
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Pushed version: $VERSION"
+
+  deploy:
+    name: Deploy to Coolify
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
       - name: Connect to Tailscale
         uses: tailscale/github-action@v4
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: ${{ secrets.TAILSCALE_TAG }}
+
+      - name: Update Coolify image tag
+        run: |
+          echo "Updating Coolify app image tag to: ${{ needs.build.outputs.version }}"
+          curl --request PATCH \
+            '${{ secrets.COOLIFY_URL }}/api/v1/applications/${{ secrets.COOLIFY_APP_UUID }}' \
+            --header 'Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}' \
+            --header 'Content-Type: application/json' \
+            --data '{
+              "docker_registry_image_tag": "${{ needs.build.outputs.version }}"
+            }'
 
       - name: Deploy to Coolify
         run: |
