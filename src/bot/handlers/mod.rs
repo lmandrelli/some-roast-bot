@@ -33,18 +33,6 @@ pub fn event_handler<'a>(
     _data: &'a Data,
 ) -> BoxFuture<'a, Result<(), Error>> {
     Box::pin(async move {
-        // Handle message edits (link-fix replies must stay in sync)
-        if let FullEvent::MessageUpdate {
-            event: update_event,
-            ..
-        } = event
-        {
-            if let Err(e) = social_link::handle_message_update(ctx, update_event).await {
-                tracing::warn!("Link-fix edit handler failed: {}", e);
-            }
-            return Ok(());
-        }
-
         if let FullEvent::Message { new_message } = event {
             // Ignore messages from bots to avoid loops
             if new_message.author.bot {

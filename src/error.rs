@@ -33,11 +33,21 @@ impl ChutesErrorType {
 
     pub fn message(&self) -> &'static str {
         match self {
-            ChutesErrorType::OutOfTokens => "Oh non, j'ai plus de tokens ! Même mon cerveau artificiel fait faillite...",
-            ChutesErrorType::ServerOutOfCapacity => "Les serveurs sont saturés... Même Chutes a besoin d'une pause café.",
-            ChutesErrorType::BadAuthentication => "Problème d'authentification... Laisse-moi entrer, j'ai perdu mes clés !",
-            ChutesErrorType::EmptyResponse => "L'IA est partie en couille et a répondu... rien. Complètement vide à l'intérieur.",
-            ChutesErrorType::Other => "Oups, quelque chose s'est mal passé ! Même Windows fait moins d'erreurs que ça...",
+            ChutesErrorType::OutOfTokens => {
+                "Oh non, j'ai plus de tokens ! Même mon cerveau artificiel fait faillite..."
+            }
+            ChutesErrorType::ServerOutOfCapacity => {
+                "Les serveurs sont saturés... Même Chutes a besoin d'une pause café."
+            }
+            ChutesErrorType::BadAuthentication => {
+                "Problème d'authentification... Laisse-moi entrer, j'ai perdu mes clés !"
+            }
+            ChutesErrorType::EmptyResponse => {
+                "L'IA est partie en couille et a répondu... rien. Complètement vide à l'intérieur."
+            }
+            ChutesErrorType::Other => {
+                "Oups, quelque chose s'est mal passé ! Même Windows fait moins d'erreurs que ça..."
+            }
         }
     }
 }

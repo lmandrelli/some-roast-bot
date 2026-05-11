@@ -13,6 +13,7 @@ use poise::serenity_prelude as serenity;
 async fn main() {
     dotenv().ok();
     tracing_subscriber::fmt::init();
+    tracing::info!("Starting some-roast-bot v{}", env!("CARGO_PKG_VERSION"));
 
     // Initialise the SQLite-backed memory for news deduplication
     memory::init();
