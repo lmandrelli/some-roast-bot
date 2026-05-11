@@ -59,7 +59,6 @@ jobs:
       - name: Extract version tag
         id: version
         run: |
-          # github.ref_name for tags like v0.2.1 -> strip leading 'v' to get 0.2.1
           VERSION="${GITHUB_REF_NAME#v}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Pushed version: $VERSION"
@@ -76,68 +75,24 @@ jobs:
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: ${{ secrets.TAILSCALE_TAG }}
 
-      - name: Update Coolify image tag and deploy
+      - name: Trigger Coolify deploy
         run: |
-          # ── Secret configuration ─────────────────────────────────────────
-          # COOLIFY_WEBHOOK  → full deploy webhook URL copied from Coolify UI
-          # COOLIFY_TOKEN    → API token created in Coolify (Keys & Tokens > API Tokens)
-          # COOLIFY_APP_UUID → (optional) application/service UUID; if omitted it is
-          #                     extracted automatically from the webhook URL
-          # ────────────────────────────────────────────────────────────────
-
           WEBHOOK="${{ secrets.COOLIFY_WEBHOOK }}"
           TOKEN="${{ secrets.COOLIFY_TOKEN }}"
-          VERSION="${{ needs.build.outputs.version }}"
 
-          # Derive base URL from webhook (strip everything from /api/v1/deploy onward)
-          BASE_URL=$(echo "$WEBHOOK" | sed -E 's|(/api/v1)?/deploy.*||' | sed 's|/$||')
-          echo "Derived Coolify base URL: $BASE_URL"
-
-          # Extract UUID from webhook query param if COOLIFY_APP_UUID is not set
-          APP_UUID="${{ secrets.COOLIFY_APP_UUID }}"
-          if [ -z "$APP_UUID" ]; then
-            APP_UUID=$(echo "$WEBHOOK" | grep -oP 'uuid=\K[^&]+')
-            echo "Extracted UUID from webhook: $APP_UUID"
-          fi
-
-          echo "Updating image tag to: $VERSION"
-
-          # Try Application endpoint first
-          HTTP_CODE=$(curl -s -o /tmp/coolify_patch_response.txt -w "%{http_code}" \
-            --request PATCH \
-            "$BASE_URL/api/v1/applications/$APP_UUID" \
-            --header "Authorization: Bearer $TOKEN" \
-            --header "Content-Type: application/json" \
-            --data "{\"docker_registry_image_tag\": \"$VERSION\"}")
-
-          echo "Application PATCH HTTP status: $HTTP_CODE"
-
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "Application PATCH failed (status $HTTP_CODE). Trying Service endpoint..."
-            cat /tmp/coolify_patch_response.txt
-            echo ""
-
-            HTTP_CODE=$(curl -s -o /tmp/coolify_patch_response.txt -w "%{http_code}" \
-              --request PATCH \
-              "$BASE_URL/api/v1/services/$APP_UUID" \
-              --header "Authorization: Bearer $TOKEN" \
-              --header "Content-Type: application/json" \
-            --data "{\"docker_registry_image_tag\": \"$VERSION\"}")
-
-            echo "Service PATCH HTTP status: $HTTP_CODE"
-
-            if [ "$HTTP_CODE" != "200" ]; then
-              echo "Service PATCH also failed (status $HTTP_CODE). Response:"
-              cat /tmp/coolify_patch_response.txt
-              echo ""
-              echo "Falling back to force deploy webhook..."
-            else
-              echo "Service image tag updated successfully."
-            fi
+          # Append force=true to the webhook URL to request a fresh pull.
+          # Note: Coolify has a known bug where force=true restarts the
+          # container without re-pulling the image when using :latest.
+          # See: https://github.com/coollabsio/coolify/issues/5318
+          #
+          # Once Coolify fixes this bug, the workflow will automatically
+          # start pulling the latest image on every deploy.
+          if [[ "$WEBHOOK" == *"?"* ]]; then
+            WEBHOOK="${WEBHOOK}&force=true"
           else
-            echo "Application image tag updated successfully."
+            WEBHOOK="${WEBHOOK}?force=true"
           fi
 
-          echo "Triggering Coolify deploy via webhook..."
+          echo "Triggering Coolify deploy: $WEBHOOK"
           curl -f -s -S --request GET "$WEBHOOK" \
-            --header "Authorization: Bearer $TOKEN" || true
+            --header "Authorization: Bearer $TOKEN"
