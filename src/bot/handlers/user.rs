@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use poise::serenity_prelude::Mentionable;
 
 use crate::bot::context;
 use crate::bot::handler::{HandlerContext, MessageHandler};
@@ -53,21 +52,15 @@ impl MessageHandler for UserHandler {
 
         let tagger_name = &msg.author.name;
         let target_name = &target_user.name;
-        let target_mention = target_user.id.mention().to_string();
 
-        let output = crate::agents::roast_user(
-            &ctx.llm_service,
-            tagger_name,
-            target_name,
-            &target_mention,
-            &channel_ctx,
-        )
-        .await?;
+        let output =
+            crate::agents::roast_user(&ctx.llm_service, tagger_name, target_name, &channel_ctx)
+                .await?;
 
         ctx.memory
             .record_roast(&msg.author.id.to_string(), Some(&output.mention_id), "user")
             .map_err(|e| BotError::Db(e))?;
 
-        Ok(Some(output.roast))
+        Ok(Some(format!("<@{}> {}", output.mention_id, output.roast)))
     }
 }

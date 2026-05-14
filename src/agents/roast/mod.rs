@@ -89,10 +89,16 @@ pub fn parse_roast_response(raw: &str) -> Result<RoastOutput, LlmError> {
     })?;
     let topic = extract_tag(raw, "topic");
 
-    if mention.trim().is_empty() {
+    let mention = mention.trim();
+    if mention.is_empty() {
         return Err(LlmError::Parse(
             "The `<mention>` tag is present but empty. It must contain a valid Discord user ID."
                 .to_string(),
+        ));
+    }
+    if !mention.chars().all(|c| c.is_ascii_digit()) {
+        return Err(LlmError::Parse(
+            "The `<mention>` tag must contain a valid numeric Discord user ID.".to_string(),
         ));
     }
     if roast.trim().is_empty() {

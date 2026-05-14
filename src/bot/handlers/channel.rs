@@ -35,6 +35,6 @@ impl MessageHandler for ChannelHandler {
             .record_roast(&triggerer_id, Some(&output.mention_id), "channel")
             .map_err(|e| BotError::Db(e))?;
 
-        Ok(Some(output.roast))
+        Ok(Some(format!("<@{}> {}", output.mention_id, output.roast)))
     }
 }

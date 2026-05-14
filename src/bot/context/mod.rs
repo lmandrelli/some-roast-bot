@@ -21,13 +21,11 @@ pub struct FormattedMessage {
 pub struct ChannelContext {
     pub trigger: Option<FormattedMessage>,
     pub messages: Vec<FormattedMessage>,
-    #[allow(dead_code)]
-    pub total_messages: usize,
 }
 
-impl ChannelContext {
-    pub fn to_string(&self) -> String {
-        formatter::format_channel_context(self)
+impl std::fmt::Display for ChannelContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&formatter::format_channel_context(self))
     }
 }
 
@@ -46,83 +44,25 @@ pub async fn fetch_channel_context(
         timestamp: trigger_msg.timestamp,
         author_name: trigger_msg.author.name.clone(),
         author_mention_id: trigger_msg.author.id.to_string(),
-        content: trigger_msg.content.clone(),
+        content: crate::bot::utils::strip_mentions(&trigger_msg.content),
     };
 
     let mut formatted: Vec<FormattedMessage> = messages
         .iter()
+        .filter(|m| m.id != trigger_msg.id)
         .filter(|m| !filter_bot || !m.author.bot)
         .map(|m| FormattedMessage {
             timestamp: m.timestamp,
             author_name: m.author.name.clone(),
             author_mention_id: m.author.id.to_string(),
-            content: m.content.clone(),
+            content: crate::bot::utils::strip_mentions(&m.content),
         })
         .collect();
 
     formatted.reverse();
-    let total = formatted.len();
 
     Ok(ChannelContext {
         trigger: Some(trigger),
         messages: formatted,
-        total_messages: total,
     })
-}
-
-pub async fn fetch_user_context(
-    ctx: &serenity::Context,
-    channel_id: serenity::ChannelId,
-    trigger_msg: &serenity::Message,
-    target_user_id: serenity::UserId,
-) -> Result<(Vec<FormattedMessage>, ChannelContext), BotError> {
-    let builder = serenity::builder::GetMessages::new()
-        .before(trigger_msg.id)
-        .limit(CONTEXT_FETCH_LIMIT as u8);
-    let messages = channel_id.messages(&ctx.http, builder).await?;
-
-    let trigger = FormattedMessage {
-        timestamp: trigger_msg.timestamp,
-        author_name: trigger_msg.author.name.clone(),
-        author_mention_id: trigger_msg.author.id.to_string(),
-        content: trigger_msg.content.clone(),
-    };
-
-    let target_messages: Vec<FormattedMessage> = messages
-        .iter()
-        .filter(|m| m.id != trigger_msg.id)
-        .filter(|m| m.author.id == target_user_id)
-        .take(5)
-        .map(|m| FormattedMessage {
-            timestamp: m.timestamp,
-            author_name: m.author.name.clone(),
-            author_mention_id: m.author.id.to_string(),
-            content: m.content.clone(),
-        })
-        .collect();
-
-    let all_formatted: Vec<FormattedMessage> = messages
-        .iter()
-        .filter(|m| m.id != trigger_msg.id)
-        .filter(|m| !m.author.bot)
-        .map(|m| FormattedMessage {
-            timestamp: m.timestamp,
-            author_name: m.author.name.clone(),
-            author_mention_id: m.author.id.to_string(),
-            content: m.content.clone(),
-        })
-        .collect();
-
-    let mut history = all_formatted;
-    history.reverse();
-    let total = history.len();
-
-    Ok((
-        target_messages,
-        ChannelContext {
-            trigger: Some(trigger),
-            messages: history,
-            total_messages: total,
-        },
-    ))
 }

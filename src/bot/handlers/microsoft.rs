@@ -1,9 +1,7 @@
 use async_trait::async_trait;
-use poise::serenity_prelude::Mentionable;
 
 use crate::bot::context;
 use crate::bot::handler::{HandlerContext, MessageHandler};
-use crate::bot::utils;
 use crate::error::BotError;
 
 /// Handler for Microsoft/Windows keyword roasts.
@@ -38,14 +36,10 @@ impl MessageHandler for MicrosoftHandler {
         let channel_ctx =
             context::fetch_channel_context(ctx.serenity_ctx, msg.channel_id, msg, true).await?;
 
-        let clean_content = utils::strip_mentions(&msg.content);
-
         let output = crate::agents::roast_microsoft(
             &ctx.llm_service,
             ctx.memory.as_ref(),
             &msg.author.name,
-            &msg.author.id.mention().to_string(),
-            &clean_content,
             &channel_ctx,
         )
         .await?;
@@ -62,6 +56,6 @@ impl MessageHandler for MicrosoftHandler {
             .increment_microsoft_count()
             .map_err(|e| BotError::Db(e))?;
 
-        Ok(Some(output.roast))
+        Ok(Some(format!("<@{}> {}", output.mention_id, output.roast)))
     }
 }

@@ -9,15 +9,12 @@ pub async fn roast_user(
     llm_service: &LlmService,
     tagger: &str,
     target: &str,
-    target_mention: &str,
     channel_ctx: &ChannelContext,
 ) -> Result<RoastOutput, LlmError> {
     let prompt = format!(
-        "{tagger} wants you to roast {target} ({target_mention}).\n\n\
-         Channel context:\n\
-         {}\n\n\
-         Roast {target} based on what they said in the conversation.",
-        channel_ctx.to_string()
+        "{channel_ctx}\n\
+         {tagger} wants you to roast {target}. \
+         Roast {target} based on what they said in the conversation."
     );
 
     tracing::info!("Sending user roast prompt to model...");

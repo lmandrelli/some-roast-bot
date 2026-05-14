@@ -1,9 +1,7 @@
 use async_trait::async_trait;
-use poise::serenity_prelude::Mentionable;
 
 use crate::bot::context;
 use crate::bot::handler::{HandlerContext, MessageHandler};
-use crate::bot::utils;
 use crate::error::BotError;
 
 /// Handler for reply-chain roasts.
@@ -37,23 +35,11 @@ impl MessageHandler for ReplyHandler {
             context::fetch_channel_context(ctx.serenity_ctx, msg.channel_id, msg, true).await?;
 
         let tagger_name = &msg.author.name;
-        let tagger_mention = msg.author.id.mention().to_string();
-        let tagger_content = utils::strip_mentions(&msg.content);
         let target_name = &replied_msg.author.name;
-        let target_mention = replied_msg.author.id.mention().to_string();
-        let target_content = &replied_msg.content;
 
-        let output = crate::agents::roast_reply(
-            &ctx.llm_service,
-            tagger_name,
-            &tagger_mention,
-            &tagger_content,
-            target_name,
-            &target_mention,
-            target_content,
-            &channel_ctx,
-        )
-        .await?;
+        let output =
+            crate::agents::roast_reply(&ctx.llm_service, tagger_name, target_name, &channel_ctx)
+                .await?;
 
         ctx.memory
             .record_roast(
@@ -63,6 +49,6 @@ impl MessageHandler for ReplyHandler {
             )
             .map_err(|e| BotError::Db(e))?;
 
-        Ok(Some(output.roast))
+        Ok(Some(format!("<@{}> {}", output.mention_id, output.roast)))
     }
 }

@@ -9,8 +9,7 @@ pub async fn roast_truth(
     channel_ctx: &ChannelContext,
 ) -> Result<RoastOutput, LlmError> {
     let prompt = format!(
-        "{}\n\nSomeone asked \"is this true?\". Judge the claim and roast accordingly.",
-        channel_ctx.to_string()
+        "{channel_ctx}\n\nSomeone asked \"is this true?\". Judge the claim and roast accordingly."
     );
 
     tracing::info!("Sending truth roast prompt to model...");

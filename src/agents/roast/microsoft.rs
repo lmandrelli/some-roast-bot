@@ -11,8 +11,6 @@ pub async fn roast_microsoft(
     llm_service: &LlmService,
     memory: &dyn MemoryRepository,
     author: &str,
-    author_mention: &str,
-    message: &str,
     channel_ctx: &ChannelContext,
 ) -> Result<RoastOutput, LlmError> {
     let past_topics = memory
@@ -38,15 +36,9 @@ pub async fn roast_microsoft(
     );
 
     let prompt = format!(
-        "{} ({}) said: \"{}\"\n\n\
-         Channel context:\n\
-         {}\n\n\
-         They mentioned Microsoft or Windows. Destroy them. \
-         Remember: it's \"Microslop\" and \"Windaube\", always.",
-        author,
-        author_mention,
-        message,
-        channel_ctx.to_string()
+        "{channel_ctx}\n\
+         {author} mentioned Microsoft or Windows. Destroy them. \
+         Remember: it's \"Microslop\" and \"Windaube\", always."
     );
 
     tracing::info!("Sending microsoft roast prompt to model...");

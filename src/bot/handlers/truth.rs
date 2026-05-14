@@ -50,6 +50,6 @@ impl MessageHandler for TruthHandler {
             )
             .map_err(|e| BotError::Db(e))?;
 
-        Ok(Some(output.roast))
+        Ok(Some(format!("<@{}> {}", output.mention_id, output.roast)))
     }
 }

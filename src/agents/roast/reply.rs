@@ -8,20 +8,12 @@ use crate::error::LlmError;
 pub async fn roast_reply(
     llm_service: &LlmService,
     tagger: &str,
-    tagger_mention: &str,
-    tagger_msg: &str,
-    target: &str,
-    target_mention: &str,
-    target_msg: &str,
+    _target: &str,
     channel_ctx: &ChannelContext,
 ) -> Result<RoastOutput, LlmError> {
     let prompt = format!(
-        "{tagger} ({tagger_mention}) said: \"{tagger_msg}\"\n\
-         {target} ({target_mention}) said: \"{target_msg}\"\n\n\
-         Channel context (what led to this):\n\
-         {}\n\n\
-         {tagger} tagged you to settle this. Roast whoever is wrong.",
-        channel_ctx.to_string()
+        "{channel_ctx}\n\
+         {tagger} tagged you to settle this. Roast whoever is wrong."
     );
 
     tracing::info!("Sending reply roast prompt to model...");

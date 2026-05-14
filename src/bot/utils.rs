@@ -29,7 +29,6 @@ pub async fn send_roast(
     const DISCORD_LIMIT: usize = 2000;
 
     let mut remaining = text;
-    let mut first = true;
 
     while !remaining.is_empty() {
         let chunk = if remaining.len() <= DISCORD_LIMIT {
@@ -42,13 +41,7 @@ pub async fn send_roast(
             }
         };
 
-        if first {
-            channel_id.say(&ctx.http, chunk).await?;
-            first = false;
-        } else {
-            channel_id.say(&ctx.http, chunk).await?;
-        }
-
+        channel_id.say(&ctx.http, chunk).await?;
         remaining = remaining[chunk.len()..].trim_start();
     }
 
