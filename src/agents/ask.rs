@@ -6,7 +6,7 @@ use crate::error::LlmError;
 /// Ask the AI a question with sarcastic roast flavor.
 pub async fn ask(llm_service: &LlmService, question: &str) -> Result<String, LlmError> {
     let agent = llm_service
-        .build_search_agent(crate::agents::preambles::ASK)
+        .build_agent(crate::agents::preambles::ASK)
         .await?;
 
     tracing::info!("Sending /ask prompt to model...");

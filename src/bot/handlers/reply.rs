@@ -34,16 +34,7 @@ impl MessageHandler for ReplyHandler {
         );
 
         let channel_ctx =
-            context::fetch_channel_context(ctx.serenity_ctx, msg.channel_id, msg.id, 10, true)
-                .await?;
-
-        ctx.memory
-            .record_roast(
-                &msg.author.id.to_string(),
-                Some(&replied_msg.author.id.to_string()),
-                "reply",
-            )
-            .map_err(|e| BotError::Db(e))?;
+            context::fetch_channel_context(ctx.serenity_ctx, msg.channel_id, msg, true).await?;
 
         let tagger_name = &msg.author.name;
         let tagger_mention = msg.author.id.mention().to_string();
@@ -52,10 +43,8 @@ impl MessageHandler for ReplyHandler {
         let target_mention = replied_msg.author.id.mention().to_string();
         let target_content = &replied_msg.content;
 
-        let response = crate::agents::roast_reply(
+        let output = crate::agents::roast_reply(
             &ctx.llm_service,
-            ctx.serenity_ctx.clone().into(),
-            msg.channel_id,
             tagger_name,
             &tagger_mention,
             &tagger_content,
@@ -66,6 +55,14 @@ impl MessageHandler for ReplyHandler {
         )
         .await?;
 
-        Ok(Some(response))
+        ctx.memory
+            .record_roast(
+                &msg.author.id.to_string(),
+                Some(&output.mention_id),
+                "reply",
+            )
+            .map_err(|e| BotError::Db(e))?;
+
+        Ok(Some(output.roast))
     }
 }

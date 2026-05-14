@@ -36,24 +36,11 @@ impl MessageHandler for MicrosoftHandler {
         );
 
         let channel_ctx =
-            context::fetch_channel_context(ctx.serenity_ctx, msg.channel_id, msg.id, 5, true)
-                .await?;
+            context::fetch_channel_context(ctx.serenity_ctx, msg.channel_id, msg, true).await?;
 
         let clean_content = utils::strip_mentions(&msg.content);
 
-        ctx.memory
-            .record_roast(
-                &msg.author.id.to_string(),
-                Some(&msg.author.id.to_string()),
-                "microsoft",
-            )
-            .map_err(|e| BotError::Db(e))?;
-
-        ctx.memory
-            .increment_microsoft_count()
-            .map_err(|e| BotError::Db(e))?;
-
-        let response = crate::agents::roast_microsoft(
+        let output = crate::agents::roast_microsoft(
             &ctx.llm_service,
             ctx.memory.as_ref(),
             &msg.author.name,
@@ -63,6 +50,18 @@ impl MessageHandler for MicrosoftHandler {
         )
         .await?;
 
-        Ok(Some(response))
+        ctx.memory
+            .record_roast(
+                &msg.author.id.to_string(),
+                Some(&output.mention_id),
+                "microsoft",
+            )
+            .map_err(|e| BotError::Db(e))?;
+
+        ctx.memory
+            .increment_microsoft_count()
+            .map_err(|e| BotError::Db(e))?;
+
+        Ok(Some(output.roast))
     }
 }

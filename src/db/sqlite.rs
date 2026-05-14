@@ -104,6 +104,11 @@ impl MemoryRepository for SqliteMemoryRepository {
             "INSERT INTO news (topic, used_at) VALUES (?1, ?2)",
             (topic, Utc::now().to_rfc3339()),
         )?;
+        // Keep only the 10 most recent topics to prevent prompt bloat
+        guard.execute(
+            "DELETE FROM news WHERE id NOT IN (SELECT id FROM news ORDER BY id DESC LIMIT 10)",
+            [],
+        )?;
         Ok(())
     }
 

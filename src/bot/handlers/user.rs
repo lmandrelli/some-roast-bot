@@ -48,40 +48,26 @@ impl MessageHandler for UserHandler {
             target_user.name
         );
 
-        let (target_messages, channel_ctx) = context::fetch_user_context(
-            ctx.serenity_ctx,
-            msg.channel_id,
-            msg.id,
-            target_user.id,
-            25,
-            5,
-        )
-        .await?;
-
-        ctx.memory
-            .record_roast(
-                &msg.author.id.to_string(),
-                Some(&target_user.id.to_string()),
-                "user",
-            )
-            .map_err(|e| BotError::Db(e))?;
+        let channel_ctx =
+            context::fetch_channel_context(ctx.serenity_ctx, msg.channel_id, msg, true).await?;
 
         let tagger_name = &msg.author.name;
         let target_name = &target_user.name;
         let target_mention = target_user.id.mention().to_string();
 
-        let response = crate::agents::roast_user(
+        let output = crate::agents::roast_user(
             &ctx.llm_service,
-            ctx.serenity_ctx.clone().into(),
-            msg.channel_id,
             tagger_name,
             target_name,
             &target_mention,
-            &target_messages,
             &channel_ctx,
         )
         .await?;
 
-        Ok(Some(response))
+        ctx.memory
+            .record_roast(&msg.author.id.to_string(), Some(&output.mention_id), "user")
+            .map_err(|e| BotError::Db(e))?;
+
+        Ok(Some(output.roast))
     }
 }

@@ -6,7 +6,7 @@ use crate::error::LlmError;
 /// Research a topic with web search.
 pub async fn research(llm_service: &LlmService, question: &str) -> Result<String, LlmError> {
     let agent = llm_service
-        .build_search_agent(crate::agents::preambles::RESEARCH)
+        .build_agent(crate::agents::preambles::RESEARCH)
         .await?;
 
     tracing::info!("Sending /research prompt to model...");

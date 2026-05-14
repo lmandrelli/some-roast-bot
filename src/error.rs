@@ -44,6 +44,9 @@ pub enum LlmError {
 
     #[error("Empty response from model")]
     EmptyResponse,
+
+    #[error("Parse failed: {0}")]
+    Parse(String),
 }
 
 // ---------------------------------------------------------------------------

@@ -18,9 +18,39 @@ pub async fn strip_self_mentions(ctx: &serenity::Context, content: &str) -> Stri
     re.replace_all(content, "<filtered>").to_string()
 }
 
-/// Extract a mentioned user ID from text.
-pub fn extract_mentioned_user(content: &str) -> Option<String> {
-    let re = regex::Regex::new(r"<@!?(\d+)>").ok()?;
-    let caps = re.captures(content)?;
-    caps.get(1).map(|m| m.as_str().to_string())
+/// Send a roast message, splitting at word boundaries if it exceeds
+/// Discord's 2000 character limit. Follow-up parts are sent as normal
+/// channel messages.
+pub async fn send_roast(
+    ctx: &serenity::Context,
+    channel_id: serenity::ChannelId,
+    text: &str,
+) -> Result<(), serenity::Error> {
+    const DISCORD_LIMIT: usize = 2000;
+
+    let mut remaining = text;
+    let mut first = true;
+
+    while !remaining.is_empty() {
+        let chunk = if remaining.len() <= DISCORD_LIMIT {
+            remaining
+        } else {
+            // Try to find a word boundary before the limit
+            match remaining[..DISCORD_LIMIT].rfind(' ') {
+                Some(idx) => &remaining[..idx],
+                None => &remaining[..DISCORD_LIMIT],
+            }
+        };
+
+        if first {
+            channel_id.say(&ctx.http, chunk).await?;
+            first = false;
+        } else {
+            channel_id.say(&ctx.http, chunk).await?;
+        }
+
+        remaining = remaining[chunk.len()..].trim_start();
+    }
+
+    Ok(())
 }

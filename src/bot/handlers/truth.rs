@@ -2,7 +2,6 @@ use async_trait::async_trait;
 
 use crate::bot::context;
 use crate::bot::handler::{HandlerContext, MessageHandler};
-use crate::bot::utils;
 use crate::error::BotError;
 
 /// Handler for "is this true?" / "is that true?" truth checks.
@@ -39,27 +38,18 @@ impl MessageHandler for TruthHandler {
         );
 
         let channel_ctx =
-            context::fetch_channel_context(ctx.serenity_ctx, msg.channel_id, msg.id, 20, true)
-                .await?;
+            context::fetch_channel_context(ctx.serenity_ctx, msg.channel_id, msg, true).await?;
 
-        let response = crate::agents::roast_truth(
-            &ctx.llm_service,
-            ctx.serenity_ctx.clone().into(),
-            msg.channel_id,
-            &channel_ctx,
-        )
-        .await?;
+        let output = crate::agents::roast_truth(&ctx.llm_service, &channel_ctx).await?;
 
-        if let Some(target_id) = utils::extract_mentioned_user(&response) {
-            ctx.memory
-                .record_roast(&msg.author.id.to_string(), Some(&target_id), "truth")
-                .map_err(|e| BotError::Db(e))?;
-        } else {
-            ctx.memory
-                .record_roast(&msg.author.id.to_string(), None, "truth")
-                .map_err(|e| BotError::Db(e))?;
-        }
+        ctx.memory
+            .record_roast(
+                &msg.author.id.to_string(),
+                Some(&output.mention_id),
+                "truth",
+            )
+            .map_err(|e| BotError::Db(e))?;
 
-        Ok(Some(response))
+        Ok(Some(output.roast))
     }
 }

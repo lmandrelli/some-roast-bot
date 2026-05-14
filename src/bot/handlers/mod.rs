@@ -74,7 +74,7 @@ pub async fn event_handler(
             Ok(Some(response)) => {
                 if !response.is_empty() {
                     let response = utils::strip_self_mentions(ctx, &response).await;
-                    new_message.reply(&ctx.http, &response).await?;
+                    utils::send_roast(ctx, new_message.channel_id, &response).await?;
                 }
             }
             Ok(None) => {
