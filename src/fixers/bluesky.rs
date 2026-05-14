@@ -16,7 +16,7 @@ pub async fn fix(text: &str) -> Vec<FixedLink> {
         let handle = &caps[1];
         let rkey = &caps[2];
 
-        let api_url = format!("{}/profile/{}/post/{}", API_BASE, handle, rkey);
+        let api_url = format!("{}/2/status/{}/{}", API_BASE, handle, rkey);
         let (fixed_url, translated) = match fetch_lang(&api_url).await {
             Some(lang) if should_translate(Some(&lang)) => (
                 format!("{}/profile/{}/post/{}/fr", FIX_BASE, handle, rkey),
@@ -46,7 +46,12 @@ async fn fetch_lang(api_url: &str) -> Option<String> {
         .build()
         .ok()?;
 
-    let resp = client.get(api_url).send().await.ok()?;
+    let resp = client
+        .get(api_url)
+        .header("User-Agent", "some-roast-bot/0.3.0")
+        .send()
+        .await
+        .ok()?;
     if !resp.status().is_success() {
         return None;
     }
@@ -56,5 +61,7 @@ async fn fetch_lang(api_url: &str) -> Option<String> {
         return None;
     }
 
-    data.post.and_then(|p| p.lang)
+    data.status
+        .and_then(|s| s.lang)
+        .or_else(|| data.post.and_then(|p| p.lang))
 }

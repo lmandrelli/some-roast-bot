@@ -5,11 +5,14 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize)]
 pub struct FxEmbedResponse {
     pub code: u16,
+    #[serde(default)]
     pub message: String,
-    /// Twitter/X content (when calling api.fxtwitter.com)
+    /// Twitter/X v1 content (legacy)
     pub tweet: Option<FxContent>,
-    /// Bluesky content (when calling api.fxbsky.app)
+    /// Bluesky v1 content (legacy)
     pub post: Option<FxContent>,
+    /// V2 API content (used by both Twitter/X and Bluesky v2 endpoints)
+    pub status: Option<FxContent>,
 }
 
 #[derive(Debug, Deserialize)]
