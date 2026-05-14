@@ -1,4 +1,54 @@
-//! Chutes API error classification and GIF responses.
+use std::error::Error as StdError;
+
+#[derive(Debug, thiserror::Error)]
+pub enum BotError {
+    #[error("Discord API error: {0}")]
+    Discord(#[from] serenity::Error),
+
+    #[error("Database error: {0}")]
+    Db(#[from] DbError),
+
+    #[error("LLM service error: {0}")]
+    Llm(#[from] LlmError),
+
+    #[error("Configuration error: {0}")]
+    Config(#[from] crate::config::ConfigError),
+
+    #[error("No handler matched for this message")]
+    NoHandler,
+
+    #[error("Unknown error: {0}")]
+    Other(String),
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Database operation failed: {0}")]
+pub struct DbError(pub rusqlite::Error);
+
+impl From<rusqlite::Error> for DbError {
+    fn from(e: rusqlite::Error) -> Self {
+        DbError(e)
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum LlmError {
+    #[error("MCP connection failed: {0}")]
+    McpConnection(String),
+
+    #[error("MCP tool listing failed: {0}")]
+    McpToolListing(String),
+
+    #[error("Completion failed: {0}")]
+    Completion(String),
+
+    #[error("Empty response from model")]
+    EmptyResponse,
+}
+
+// ---------------------------------------------------------------------------
+// Chutes-specific error classification (kept for Discord-friendly responses)
+// ---------------------------------------------------------------------------
 
 /// Classified Chutes error types with their associated GIFs and messages.
 #[derive(Debug, Clone)]
@@ -34,7 +84,7 @@ impl ChutesErrorType {
     pub fn message(&self) -> &'static str {
         match self {
             ChutesErrorType::OutOfTokens => {
-                "Oh non, j'ai plus de tokens ! Même mon cerveau artificiel fait faillite..."
+                "Oh non ! J'ai mangé tous les tokens ! Vous voulez pas me soutenir sur Tipee ?"
             }
             ChutesErrorType::ServerOutOfCapacity => {
                 "Les serveurs sont saturés... Même Chutes a besoin d'une pause café."
@@ -43,26 +93,24 @@ impl ChutesErrorType {
                 "Problème d'authentification... Laisse-moi entrer, j'ai perdu mes clés !"
             }
             ChutesErrorType::EmptyResponse => {
-                "L'IA est partie en couille et a répondu... rien. Complètement vide à l'intérieur."
+                "Imagine payer pour une requête API, et que tu n'ais rien à recevoir en retour. C'est ma situation. Fun."
             }
             ChutesErrorType::Other => {
-                "Oups, quelque chose s'est mal passé ! Même Windows fait moins d'erreurs que ça..."
+                "Oups, quelque chose s'est mal passé ! Mais je suis toujours plus stable que Windows."
             }
         }
     }
 }
 
 /// Classify an error into a Chutes error type by inspecting the error chain.
-pub fn classify_chutes_error(error: &dyn std::error::Error) -> ChutesErrorType {
+pub fn classify_chutes_error(error: &dyn StdError) -> ChutesErrorType {
     let error_string = format!("{:#}", error);
     let lower = error_string.to_lowercase();
 
-    // Check the full error chain for patterns
-    let mut current: Option<&dyn std::error::Error> = Some(error);
+    let mut current: Option<&dyn StdError> = Some(error);
     while let Some(err) = current {
         let msg = err.to_string().to_lowercase();
 
-        // Out of tokens / context length
         if msg.contains("context length exceeded")
             || msg.contains("maximum context length")
             || msg.contains("token limit")
@@ -73,7 +121,6 @@ pub fn classify_chutes_error(error: &dyn std::error::Error) -> ChutesErrorType {
             return ChutesErrorType::OutOfTokens;
         }
 
-        // Server out of capacity / overloaded
         if msg.contains("503")
             || msg.contains("service unavailable")
             || msg.contains("overloaded")
@@ -86,7 +133,6 @@ pub fn classify_chutes_error(error: &dyn std::error::Error) -> ChutesErrorType {
             return ChutesErrorType::ServerOutOfCapacity;
         }
 
-        // Bad authentication
         if msg.contains("401")
             || msg.contains("403")
             || msg.contains("unauthorized")
@@ -99,7 +145,6 @@ pub fn classify_chutes_error(error: &dyn std::error::Error) -> ChutesErrorType {
             return ChutesErrorType::BadAuthentication;
         }
 
-        // Empty LLM response (no message or tool call)
         if msg.contains("no message or tool call")
             || msg.contains("response contained no message")
             || lower.contains("empty")
@@ -110,12 +155,11 @@ pub fn classify_chutes_error(error: &dyn std::error::Error) -> ChutesErrorType {
         current = err.source();
     }
 
-    // Default fallback for any other LLM or generic error
     ChutesErrorType::Other
 }
 
 /// Build a Discord-formatted error response with the GIF and message.
-pub fn discord_error_response(error: &dyn std::error::Error) -> String {
+pub fn discord_error_response(error: &dyn StdError) -> String {
     let classified = classify_chutes_error(error);
     format!("{}\n{}", classified.message(), classified.gif_url())
 }

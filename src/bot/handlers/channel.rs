@@ -1,50 +1,74 @@
-use poise::serenity_prelude::{self as serenity};
-use std::sync::Arc;
+use async_trait::async_trait;
 
-use crate::bot::Error;
 use crate::bot::context;
+use crate::bot::handler::{HandlerContext, MessageHandler};
+use crate::bot::utils;
+use crate::error::BotError;
 
-pub fn extract_mentioned_user(content: &str) -> Option<String> {
-    let re = regex::Regex::new(r"<@!?(\d+)>").ok()?;
-    let caps = re.captures(content)?;
-    caps.get(1).map(|m| m.as_str().to_string())
-}
+/// Handler for channel roasts (bot tagged alone).
+pub struct ChannelHandler;
 
-pub async fn handle_channel(
-    ctx: &serenity::Context,
-    msg: &serenity::Message,
-) -> Result<String, Error> {
-    tracing::info!("Priority 3: Channel roast triggered by {}", msg.author.name);
+#[async_trait]
+impl MessageHandler for ChannelHandler {
+    fn name(&self) -> &'static str {
+        "channel"
+    }
 
-    let triggerer_id = msg.author.id.to_string();
-    let channel_ctx = context::fetch_channel_context(ctx, msg.channel_id, msg.id, 20, true).await?;
+    fn priority(&self) -> u8 {
+        12
+    }
 
-    let mut response =
-        crate::agents::roast_channel(Arc::new(ctx.clone()), msg.channel_id, &channel_ctx).await?;
+    async fn can_handle(&self, ctx: &HandlerContext<'_>) -> bool {
+        ctx.mentions_me
+    }
 
-    for _ in 0..3 {
-        if let Some(target_id) = extract_mentioned_user(&response) {
-            if target_id != triggerer_id {
-                crate::memory::record_roast(&triggerer_id, Some(&target_id), "channel");
-                return Ok(response);
-            }
-        }
+    async fn handle(&self, ctx: &HandlerContext<'_>) -> Result<Option<String>, BotError> {
+        let msg = ctx.message;
+        tracing::info!("Channel roast triggered by {}", msg.author.name);
 
-        let retry_context = format!(
-            "{}\n\nTu as mentionné la mauvaise personne. Choisis quelqu'un d'autre que <@{triggerer_id}> cette fois.",
-            channel_ctx.to_string()
-        );
-        response = crate::agents::roast_channel_with_context(
-            Arc::new(ctx.clone()),
+        let triggerer_id = msg.author.id.to_string();
+        let channel_ctx =
+            context::fetch_channel_context(ctx.serenity_ctx, msg.channel_id, msg.id, 20, true)
+                .await?;
+
+        let mut response = crate::agents::roast_channel(
+            &ctx.llm_service,
+            ctx.serenity_ctx.clone().into(),
             msg.channel_id,
-            &retry_context,
+            &channel_ctx,
         )
         .await?;
-    }
 
-    if let Some(target_id) = extract_mentioned_user(&response) {
-        crate::memory::record_roast(&triggerer_id, Some(&target_id), "channel");
-    }
+        // Retry up to 3 times if the bot mentions the triggerer
+        for _ in 0..3 {
+            if let Some(target_id) = utils::extract_mentioned_user(&response) {
+                if target_id != triggerer_id {
+                    ctx.memory
+                        .record_roast(&triggerer_id, Some(&target_id), "channel")
+                        .map_err(|e| BotError::Db(e))?;
+                    return Ok(Some(response));
+                }
+            }
 
-    Ok(response)
+            let retry_context = format!(
+                "{}\n\nTu as mentionné la mauvaise personne. Choisis quelqu'un d'autre que <@{triggerer_id}> cette fois.",
+                channel_ctx.to_string()
+            );
+            response = crate::agents::roast_channel_with_context(
+                &ctx.llm_service,
+                ctx.serenity_ctx.clone().into(),
+                msg.channel_id,
+                &retry_context,
+            )
+            .await?;
+        }
+
+        if let Some(target_id) = utils::extract_mentioned_user(&response) {
+            ctx.memory
+                .record_roast(&triggerer_id, Some(&target_id), "channel")
+                .map_err(|e| BotError::Db(e))?;
+        }
+
+        Ok(Some(response))
+    }
 }

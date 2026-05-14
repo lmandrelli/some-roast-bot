@@ -1,24 +1,33 @@
 mod agents;
 mod bot;
+pub mod config;
+pub mod db;
 pub mod error;
 pub mod fixers;
-pub mod memory;
 pub mod models;
 
-use bot::Data;
+use std::sync::Arc;
+
 use dotenv::dotenv;
 use poise::serenity_prelude as serenity;
 
+use agents::llm::LlmService;
+use bot::Data;
+use config::Config;
+use db::sqlite::SqliteMemoryRepository;
+
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), BotError> {
     dotenv().ok();
     tracing_subscriber::fmt::init();
     tracing::info!("Starting some-roast-bot v{}", env!("CARGO_PKG_VERSION"));
 
-    // Initialise the SQLite-backed memory for news deduplication
-    memory::init();
+    let config = Arc::new(Config::from_env()?);
+    let memory = Arc::new(SqliteMemoryRepository::new(&config.memory_db_path)?);
+    let llm_service = Arc::new(LlmService::new(&config));
+    let pipeline = bot::handlers::build_pipeline();
 
-    let token = std::env::var("DISCORD_TOKEN").expect("missing DISCORD_TOKEN");
+    let token = config.discord_token.clone();
     let intents =
         serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT;
 
@@ -31,7 +40,7 @@ async fn main() {
                 bot::commands::stats(),
             ],
             event_handler: |ctx, event, framework, data| {
-                bot::handlers::event_handler(ctx, event, framework, data)
+                Box::pin(bot::handlers::event_handler(ctx, event, framework, data))
             },
             ..Default::default()
         })
@@ -49,8 +58,7 @@ async fn main() {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                 tracing::info!("Commands registered successfully");
 
-                let is_prod = std::env::var("PROD").unwrap_or_default() != "0";
-                let activity_name = if is_prod {
+                let activity_name = if config.is_prod {
                     "don't try to talk about Microsoft".to_string()
                 } else {
                     format!("running v{}", env!("CARGO_PKG_VERSION"))
@@ -58,16 +66,23 @@ async fn main() {
 
                 ctx.set_activity(Some(serenity::ActivityData::custom(activity_name)));
 
-                Ok(Data)
+                Ok(Data {
+                    memory,
+                    llm_service,
+                    pipeline,
+                })
             })
         })
         .build();
 
     serenity::ClientBuilder::new(token, intents)
         .framework(framework)
-        .await
-        .unwrap()
+        .await?
         .start()
-        .await
-        .unwrap();
+        .await?;
+
+    Ok(())
 }
+
+// Re-export BotError at crate root for convenience
+pub use error::BotError;

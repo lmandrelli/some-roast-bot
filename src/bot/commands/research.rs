@@ -8,13 +8,13 @@ pub async fn research(
 ) -> Result<(), Error> {
     ctx.defer().await?;
 
-    match crate::agents::research(&question).await {
+    match crate::agents::research(&ctx.data().llm_service, &question).await {
         Ok(response) => {
             ctx.say(response).await?;
         }
         Err(e) => {
             tracing::error!("Research command failed: {:?}", e);
-            let error_response = crate::error::discord_error_response(&*e);
+            let error_response = crate::error::discord_error_response(&e);
             ctx.send(
                 poise::CreateReply::default()
                     .content(error_response)

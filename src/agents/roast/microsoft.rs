@@ -1,44 +1,26 @@
-use rig::client::{CompletionClient, ProviderClient};
 use rig::completion::Prompt;
-use rig::providers::openai::CompletionsClient;
-use rmcp::{model::ClientInfo, service::ServiceExt, transport::StreamableHttpClientTransport};
 
-const PREAMBLE: &str = r#"You are Kimi K2.5, a brutal roast bot in a Discord server. Someone just mentioned Microsoft or Windows, and you MUST mock them relentlessly.
-
-STEP 1 — CHECK ALREADY USED TOPICS:
-Read the "Already Used Topics" list below BEFORE searching. You MUST NOT reuse any of them.
-
-STEP 2 — SEARCH FOR FRESH NEWS:
-Search the web for Microsoft or Windows fails, bugs, controversies, or dumb decisions.
-PREFER community sources like Reddit: r/MicroSlop (https://www.reddit.com/r/MicroSlop/), r/windows, r/microsoft, r/sysadmin. (you may have to put that in the search query)
-Pick a topic that is NOT in the already used list.
-Search a topic linked to the person message containing "Microsoft" or "Windows", if user did not talk about anything specific, just search for the latest general news.
-
-STEP 3 — WRITE YOUR ROAST:
-Rules:
-1. You MUST respond in French as your primary language. Always write in French.
-2. If user said "Microsoft", your response MUST be a really short sentence that says to the user that they should say "Microslop" here
-Or If user said "Windows", your response MUST be a really short sentence that says to the user that they should say "Windaube" here; 
-Then follow up with 2 or 3 short sentences about a way microsoft or windows has done something dumb or annoying.
-3. ALWAYS refer to Microsoft as "Microslop" and Windows as "Windaube". You're actually roasting Microsoft and Windows, not the user here.
-4. Be savage but funny - this is all in good fun
-5. Reference what they actually said to make the roast specific
-6. You MUST start your message by pinging the user using their Discord mention (e.g. <@USER_ID>) provided in the context - NEVER just write their username
-7. At the VERY END of your message, on a new line, write exactly: [TOPIC: short description of the news you used]
-
-"#;
+use crate::agents::llm::LlmService;
+use crate::bot::context::ChannelContext;
+use crate::db::MemoryRepository;
+use crate::error::LlmError;
 
 /// Roast when someone mentions Microsoft or Windows in a message.
 /// Uses Exa web search to find latest Microsoft news and SQLite memory
 /// to avoid repeating the same topics.
 pub async fn roast_microsoft(
+    llm_service: &LlmService,
+    memory: &dyn MemoryRepository,
     author: &str,
     author_mention: &str,
     message: &str,
-    channel_ctx: &crate::bot::context::ChannelContext,
-) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    channel_ctx: &ChannelContext,
+) -> Result<String, LlmError> {
     // Fetch previously used topics from memory
-    let past_topics = crate::memory::recent_topics(20);
+    let past_topics = memory
+        .recent_topics(20)
+        .map_err(|e| LlmError::Completion(e.to_string()))?;
+
     let topics_section = if past_topics.is_empty() {
         "Already Used Topics: (none yet)\n".to_string()
     } else {
@@ -53,9 +35,13 @@ pub async fn roast_microsoft(
 
     let channel_formatted = channel_ctx.to_string();
 
-    let full_preamble = format!("{PREAMBLE}\n{topics_section}\n---\nContext:\n");
+    let full_preamble = format!(
+        "{}\n{}\n---\nContext:\n",
+        crate::agents::preambles::ROAST_MICROSOFT,
+        topics_section
+    );
 
-    let context = format!(
+    let prompt = format!(
         "{author} ({author_mention}) said: \"{message}\"\n\n\
          Channel context:\n\
          {channel_formatted}\n\n\
@@ -64,34 +50,15 @@ pub async fn roast_microsoft(
          Tag them using their mention: {author_mention}",
     );
 
-    // Build agent with MCP tools (Exa search)
-    let model_name = crate::agents::model_name();
-    let openai_client = CompletionsClient::from_env();
-    let model = openai_client.completion_model(&model_name);
+    let agent = llm_service.build_search_agent(&full_preamble).await?;
 
-    let transport = StreamableHttpClientTransport::from_uri("https://mcp.exa.ai/mcp");
-    let service = ClientInfo::default()
-        .serve(transport)
-        .await
-        .inspect_err(|e| tracing::error!("MCP client error: {:?}", e))?;
-
-    let tools = service.list_tools(Default::default()).await?;
-    tracing::info!(
-        "MCP tools available for microsoft roast: {:?}",
-        tools.tools.iter().map(|t| &t.name).collect::<Vec<_>>()
-    );
-
-    let agent = rig::agent::AgentBuilder::new(model)
-        .preamble(&full_preamble)
-        .rmcp_tools(tools.tools, service.peer().clone())
-        .build();
-
-    tracing::info!("Sending microsoft roast prompt to model ({model_name})...");
+    tracing::info!("Sending microsoft roast prompt to model...");
     let response = agent
-        .prompt(&context)
+        .prompt(&prompt)
         .max_turns(5)
         .await
-        .inspect_err(|e| tracing::error!("Microsoft roast completion error: {:?}", e))?;
+        .map_err(|e| LlmError::Completion(e.to_string()))?;
+
     tracing::info!(
         "Microsoft roast response received: {} chars",
         response.len()
@@ -101,7 +68,7 @@ pub async fn roast_microsoft(
     let (clean_response, topic) = extract_topic(&response);
     if let Some(topic) = topic {
         tracing::info!("Storing microsoft news topic: {topic}");
-        crate::memory::remember_topic(&topic);
+        let _ = memory.remember_topic(&topic);
     }
 
     Ok(clean_response)

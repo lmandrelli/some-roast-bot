@@ -1,39 +1,68 @@
-use poise::serenity_prelude::{self as serenity, Mentionable};
+use async_trait::async_trait;
+use poise::serenity_prelude::Mentionable;
 
-use crate::bot::Error;
 use crate::bot::context;
+use crate::bot::handler::{HandlerContext, MessageHandler};
+use crate::bot::utils;
+use crate::error::BotError;
 
-use super::strip_mentions;
+/// Handler for Microsoft/Windows keyword roasts.
+pub struct MicrosoftHandler;
 
-/// Checks whether a message mentions Microsoft or Windows (case-insensitive).
-pub fn contains_microsoft_keywords(content: &str) -> bool {
+fn contains_microsoft_keywords(content: &str) -> bool {
     let lower = content.to_lowercase();
     lower.contains("microsoft") || lower.contains("windows")
 }
 
-/// Roast anyone who dares mention Microsoft or Windows.
-pub async fn handle_microsoft(
-    ctx: &serenity::Context,
-    msg: &serenity::Message,
-) -> Result<String, Error> {
-    tracing::info!(
-        "Microsoft/Windows detected in message from {}",
-        msg.author.name,
-    );
+#[async_trait]
+impl MessageHandler for MicrosoftHandler {
+    fn name(&self) -> &'static str {
+        "microsoft"
+    }
 
-    let channel_ctx = context::fetch_channel_context(ctx, msg.channel_id, msg.id, 5, true).await?;
+    fn priority(&self) -> u8 {
+        2
+    }
 
-    let clean_content = strip_mentions(&msg.content);
-    crate::memory::record_roast(
-        &msg.author.id.to_string(),
-        Some(&msg.author.id.to_string()),
-        "microsoft",
-    );
-    crate::agents::roast_microsoft(
-        &msg.author.name,
-        &msg.author.id.mention().to_string(),
-        &clean_content,
-        &channel_ctx,
-    )
-    .await
+    async fn can_handle(&self, ctx: &HandlerContext<'_>) -> bool {
+        contains_microsoft_keywords(&ctx.message.content)
+    }
+
+    async fn handle(&self, ctx: &HandlerContext<'_>) -> Result<Option<String>, BotError> {
+        let msg = ctx.message;
+        tracing::info!(
+            "Microsoft/Windows detected in message from {}",
+            msg.author.name,
+        );
+
+        let channel_ctx =
+            context::fetch_channel_context(ctx.serenity_ctx, msg.channel_id, msg.id, 5, true)
+                .await?;
+
+        let clean_content = utils::strip_mentions(&msg.content);
+
+        ctx.memory
+            .record_roast(
+                &msg.author.id.to_string(),
+                Some(&msg.author.id.to_string()),
+                "microsoft",
+            )
+            .map_err(|e| BotError::Db(e))?;
+
+        ctx.memory
+            .increment_microsoft_count()
+            .map_err(|e| BotError::Db(e))?;
+
+        let response = crate::agents::roast_microsoft(
+            &ctx.llm_service,
+            ctx.memory.as_ref(),
+            &msg.author.name,
+            &msg.author.id.mention().to_string(),
+            &clean_content,
+            &channel_ctx,
+        )
+        .await?;
+
+        Ok(Some(response))
+    }
 }

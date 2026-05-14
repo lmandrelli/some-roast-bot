@@ -1,7 +1,9 @@
-use poise::serenity_prelude::{self as serenity, Timestamp};
+use poise::serenity_prelude as serenity;
 use std::time::Duration;
 
-use crate::bot::Error;
+use crate::error::BotError;
+
+pub mod formatter;
 
 const CONVERSATION_GAP_MINUTES: u64 = 5;
 const INITIAL_FETCH_LIMIT: usize = 20;
@@ -9,7 +11,7 @@ const MAX_FETCH_LIMIT: usize = 50;
 
 #[derive(Debug, Clone)]
 pub struct FormattedMessage {
-    pub timestamp: Timestamp,
+    pub timestamp: serenity::Timestamp,
     pub author_name: String,
     pub content: String,
     pub reply_to: Option<String>,
@@ -30,55 +32,7 @@ pub struct ChannelContext {
 
 impl ChannelContext {
     pub fn to_string(&self) -> String {
-        if self.threads.is_empty() {
-            return "No recent messages.".to_string();
-        }
-
-        let mut output = String::new();
-
-        if self.threads.len() > 1 {
-            output.push_str(&format!(
-                "Channel activity ({} separate conversations detected):\n\n",
-                self.threads.len()
-            ));
-        } else {
-            output.push_str("Recent channel messages (chronological order):\n\n");
-        }
-
-        for (thread_idx, thread) in self.threads.iter().enumerate() {
-            if self.threads.len() > 1 {
-                output.push_str(&format!("--- Conversation {} ---\n", thread_idx + 1));
-            }
-
-            if let Some(gap) = thread.gap_before {
-                let minutes = gap.as_secs() / 60;
-                output.push_str(&format!("(conversation break, {minutes} min gap)\n"));
-            }
-
-            for msg in &thread.messages {
-                let time_str = msg.timestamp.format("%H:%M");
-                let reply_info = match &msg.reply_to {
-                    Some(reply_target) => format!(" (replying to {reply_target})"),
-                    None => String::new(),
-                };
-                output.push_str(&format!(
-                    "[{time_str}] {}{reply_info}: \"{}\"\n",
-                    msg.author_name, msg.content
-                ));
-            }
-
-            if self.threads.len() > 1 {
-                output.push('\n');
-            }
-        }
-
-        output.push_str(&format!("\nTotal messages shown: {}", self.total_messages));
-        if self.can_fetch_more {
-            output.push_str(" (can fetch more if needed)");
-        }
-        output.push('\n');
-
-        output
+        formatter::format_channel_context(self)
     }
 }
 
@@ -88,7 +42,7 @@ pub async fn fetch_channel_context(
     before_msg_id: serenity::MessageId,
     limit: usize,
     filter_bot: bool,
-) -> Result<ChannelContext, Error> {
+) -> Result<ChannelContext, BotError> {
     let clamped_limit = limit.min(INITIAL_FETCH_LIMIT);
 
     let builder = serenity::builder::GetMessages::new()
@@ -133,7 +87,7 @@ pub async fn fetch_user_context(
     target_user_id: serenity::UserId,
     fetch_limit: usize,
     max_user_messages: usize,
-) -> Result<(Vec<FormattedMessage>, ChannelContext), Error> {
+) -> Result<(Vec<FormattedMessage>, ChannelContext), BotError> {
     let builder = serenity::builder::GetMessages::new()
         .before(before_msg_id)
         .limit(fetch_limit as u8);
@@ -226,21 +180,5 @@ fn split_into_threads(messages: &[FormattedMessage]) -> Vec<ConversationThread> 
 }
 
 pub fn format_user_messages(messages: &[FormattedMessage]) -> String {
-    if messages.is_empty() {
-        return "No messages found.".to_string();
-    }
-
-    let mut output = String::new();
-    for msg in messages {
-        let time_str = msg.timestamp.format("%H:%M");
-        let reply_info = match &msg.reply_to {
-            Some(reply_target) => format!(" (replying to {reply_target})"),
-            None => String::new(),
-        };
-        output.push_str(&format!(
-            "[{time_str}] {}{reply_info}: \"{}\"\n",
-            msg.author_name, msg.content
-        ));
-    }
-    output
+    formatter::format_user_messages(messages)
 }

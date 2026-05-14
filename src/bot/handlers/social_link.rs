@@ -1,38 +1,56 @@
-use crate::bot::Error;
+use async_trait::async_trait;
+
+use crate::bot::handler::{HandlerContext, MessageHandler};
+use crate::error::BotError;
 use crate::fixers;
-use poise::serenity_prelude as serenity;
 
-/// Detect social-media links in a message, delete the original message,
-/// and post the fixed (embed-friendly) URLs as two separate messages.
-///
-/// Returns `true` when at least one link was handled.
-pub async fn handle_social_links(
-    ctx: &serenity::Context,
-    msg: &serenity::Message,
-) -> Result<bool, Error> {
-    let fixed = fixers::fix_links(&msg.content).await;
-    if fixed.is_empty() {
-        return Ok(false);
+/// Handler for social-media link fixes.
+pub struct SocialLinkHandler;
+
+#[async_trait]
+impl MessageHandler for SocialLinkHandler {
+    fn name(&self) -> &'static str {
+        "social_link"
     }
 
-    // Delete the user's original message.
-    if let Err(e) = msg.delete(&ctx.http).await {
-        tracing::warn!("Failed to delete original msg {}: {}", msg.id, e);
+    fn priority(&self) -> u8 {
+        0
     }
 
-    let urls = fixed
-        .iter()
-        .map(|l| l.fixed_url.clone())
-        .collect::<Vec<_>>()
-        .join(" ");
+    async fn can_handle(&self, ctx: &HandlerContext<'_>) -> bool {
+        // Cheap check: are there any fixable links in the message?
+        !fixers::fix_links(&ctx.message.content).await.is_empty()
+    }
 
-    let header_text = format!("{} posted :", msg.author.name);
+    async fn handle(&self, ctx: &HandlerContext<'_>) -> Result<Option<String>, BotError> {
+        let msg = ctx.message;
+        let fixed = fixers::fix_links(&msg.content).await;
+        if fixed.is_empty() {
+            return Ok(None);
+        }
 
-    msg.channel_id.say(&ctx.http, header_text).await?;
-    msg.channel_id.say(&ctx.http, urls).await?;
+        // Delete the user's original message
+        if let Err(e) = msg.delete(&ctx.serenity_ctx.http).await {
+            tracing::warn!("Failed to delete original msg {}: {}", msg.id, e);
+        }
 
-    // Stats
-    crate::memory::record_roast(&msg.author.id.to_string(), None, "social_link");
+        let urls = fixed
+            .iter()
+            .map(|l| l.fixed_url.clone())
+            .collect::<Vec<_>>()
+            .join(" ");
 
-    Ok(true)
+        let header_text = format!("{} posted :", msg.author.name);
+
+        msg.channel_id
+            .say(&ctx.serenity_ctx.http, header_text)
+            .await?;
+        msg.channel_id.say(&ctx.serenity_ctx.http, urls).await?;
+
+        ctx.memory
+            .record_roast(&msg.author.id.to_string(), None, "social_link")
+            .map_err(|e| BotError::Db(e))?;
+
+        Ok(Some(String::new())) // empty = already sent our own messages
+    }
 }

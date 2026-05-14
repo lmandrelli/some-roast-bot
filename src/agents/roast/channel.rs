@@ -1,41 +1,58 @@
 use std::sync::Arc;
 
-use super::call_model_with_tools;
+use rig::completion::Prompt;
 
-const PREAMBLE: &str = r#"You are Kimi K2.5, a brutal roast bot in a Discord server. Someone tagged you to roast whoever deserves it in the recent conversation.
-
-Rules:
-1. You MUST respond in French as your primary language. Always write in French.
-2. Your response MUST never longer than 2 or 3 short sentences.
-3. Read the recent messages, pick the person who deserves a roast the most, and destroy them
-4. Be savage but funny - this is all in good fun
-5. Do NOT search the web, just use the conversation context provided
-6. You MUST start your message by tagging the user you're roasting using their Discord mention format (e.g. <@USER_ID>)
-7. Reference what they actually said to make the roast specific
-8. Messages are shown in chronological order with timestamps. If there are multiple conversation threads, they are separated.
-9. You have access to a `fetch_messages` tool - use it if the current context seems insufficient or if you need to see older messages.
-
-Context:
-"#;
+use crate::agents::llm::LlmService;
+use crate::bot::context::ChannelContext;
+use crate::error::LlmError;
 
 /// Roast based on recent channel messages.
 /// The bot picks who to roast and mentions them.
 pub async fn roast_channel(
+    llm_service: &LlmService,
     ctx: Arc<poise::serenity_prelude::Context>,
     channel_id: poise::serenity_prelude::ChannelId,
-    channel_ctx: &crate::bot::context::ChannelContext,
-) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    channel_ctx: &ChannelContext,
+) -> Result<String, LlmError> {
     let context_str = channel_ctx.to_string();
-    let context =
+    let prompt =
         format!("{context_str}\n\nPick someone to roast and tag them using their mention.");
-    call_model_with_tools(PREAMBLE, &context, ctx, channel_id).await
+
+    let agent =
+        llm_service.build_roast_agent(crate::agents::preambles::ROAST_CHANNEL, ctx, channel_id);
+
+    tracing::info!("Sending channel roast prompt to model...");
+    let response = agent
+        .prompt(&prompt)
+        .max_turns(5)
+        .await
+        .map_err(|e| LlmError::Completion(e.to_string()))?;
+
+    tracing::info!("Channel roast response received: {} chars", response.len());
+    Ok(response)
 }
 
 pub async fn roast_channel_with_context(
+    llm_service: &LlmService,
     ctx: Arc<poise::serenity_prelude::Context>,
     channel_id: poise::serenity_prelude::ChannelId,
     context: &str,
-) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<String, LlmError> {
     let prompt = format!("{context}\n\nPick someone to roast and tag them using their mention.");
-    call_model_with_tools(PREAMBLE, &prompt, ctx, channel_id).await
+
+    let agent =
+        llm_service.build_roast_agent(crate::agents::preambles::ROAST_CHANNEL, ctx, channel_id);
+
+    tracing::info!("Sending channel roast retry prompt to model...");
+    let response = agent
+        .prompt(&prompt)
+        .max_turns(5)
+        .await
+        .map_err(|e| LlmError::Completion(e.to_string()))?;
+
+    tracing::info!(
+        "Channel roast retry response received: {} chars",
+        response.len()
+    );
+    Ok(response)
 }

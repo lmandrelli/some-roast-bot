@@ -1,8 +1,22 @@
 pub mod commands;
 pub mod context;
+pub mod handler;
 pub mod handlers;
+pub mod pipeline;
+pub mod utils;
 
-pub struct Data;
+use std::sync::Arc;
 
-pub type Error = Box<dyn std::error::Error + Send + Sync>;
+use crate::agents::llm::LlmService;
+use crate::bot::pipeline::HandlerPipeline;
+use crate::db::MemoryRepository;
+use crate::error::BotError;
+
+pub struct Data {
+    pub memory: Arc<dyn MemoryRepository>,
+    pub llm_service: Arc<LlmService>,
+    pub pipeline: HandlerPipeline,
+}
+
+pub type Error = BotError;
 pub type Context<'a> = poise::Context<'a, Data, Error>;

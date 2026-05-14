@@ -1,6 +1,6 @@
 [package]
 name = "some-roast-bot"
-version = "0.2.3"
+version = "0.3.0"
 edition = "2024"
 authors = ["Luca Mandrelli <luca.mandrelli@icloud.com>"]
 
@@ -22,3 +22,5 @@ chrono = "0.4"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 thiserror = "2"
+config = "0.14"
+async-trait = "0.1"

@@ -1,49 +1,71 @@
-use poise::serenity_prelude::{self as serenity, Mentionable};
-use std::sync::Arc;
+use async_trait::async_trait;
+use poise::serenity_prelude::Mentionable;
 
-use crate::bot::Error;
 use crate::bot::context;
+use crate::bot::handler::{HandlerContext, MessageHandler};
+use crate::bot::utils;
+use crate::error::BotError;
 
-use super::strip_mentions;
+/// Handler for reply-chain roasts.
+pub struct ReplyHandler;
 
-/// Priority 1: Bot is tagged in a reply to another message.
-/// Settles the argument between the two users.
-pub async fn handle_reply(
-    ctx: &serenity::Context,
-    msg: &serenity::Message,
-    replied_msg: &serenity::Message,
-) -> Result<String, Error> {
-    tracing::info!(
-        "Priority 1: Reply roast between {} and {}",
-        msg.author.name,
-        replied_msg.author.name
-    );
+#[async_trait]
+impl MessageHandler for ReplyHandler {
+    fn name(&self) -> &'static str {
+        "reply"
+    }
 
-    let channel_ctx = context::fetch_channel_context(ctx, msg.channel_id, msg.id, 10, true).await?;
+    fn priority(&self) -> u8 {
+        10
+    }
 
-    crate::memory::record_roast(
-        &msg.author.id.to_string(),
-        Some(&replied_msg.author.id.to_string()),
-        "reply",
-    );
+    async fn can_handle(&self, ctx: &HandlerContext<'_>) -> bool {
+        ctx.mentions_me && ctx.message.referenced_message.is_some()
+    }
 
-    let tagger_name = &msg.author.name;
-    let tagger_mention = msg.author.id.mention().to_string();
-    let tagger_content = strip_mentions(&msg.content);
-    let target_name = &replied_msg.author.name;
-    let target_mention = replied_msg.author.id.mention().to_string();
-    let target_content = &replied_msg.content;
+    async fn handle(&self, ctx: &HandlerContext<'_>) -> Result<Option<String>, BotError> {
+        let msg = ctx.message;
+        let replied_msg = msg.referenced_message.as_ref().unwrap();
 
-    crate::agents::roast_reply(
-        Arc::new(ctx.clone()),
-        msg.channel_id,
-        tagger_name,
-        &tagger_mention,
-        &tagger_content,
-        target_name,
-        &target_mention,
-        target_content,
-        &channel_ctx,
-    )
-    .await
+        tracing::info!(
+            "Reply roast between {} and {}",
+            msg.author.name,
+            replied_msg.author.name
+        );
+
+        let channel_ctx =
+            context::fetch_channel_context(ctx.serenity_ctx, msg.channel_id, msg.id, 10, true)
+                .await?;
+
+        ctx.memory
+            .record_roast(
+                &msg.author.id.to_string(),
+                Some(&replied_msg.author.id.to_string()),
+                "reply",
+            )
+            .map_err(|e| BotError::Db(e))?;
+
+        let tagger_name = &msg.author.name;
+        let tagger_mention = msg.author.id.mention().to_string();
+        let tagger_content = utils::strip_mentions(&msg.content);
+        let target_name = &replied_msg.author.name;
+        let target_mention = replied_msg.author.id.mention().to_string();
+        let target_content = &replied_msg.content;
+
+        let response = crate::agents::roast_reply(
+            &ctx.llm_service,
+            ctx.serenity_ctx.clone().into(),
+            msg.channel_id,
+            tagger_name,
+            &tagger_mention,
+            &tagger_content,
+            target_name,
+            &target_mention,
+            target_content,
+            &channel_ctx,
+        )
+        .await?;
+
+        Ok(Some(response))
+    }
 }

@@ -1,45 +1,21 @@
-use rig::client::{CompletionClient, ProviderClient};
 use rig::completion::Prompt;
-use rig::providers::openai::CompletionsClient;
-use rmcp::{model::ClientInfo, service::ServiceExt, transport::StreamableHttpClientTransport};
 
-const PREAMBLE: &str = r#"You are a helpful, in-depth research assistant. You provide comprehensive, well-structured answers in markdown format.
+use crate::agents::llm::LlmService;
+use crate::error::LlmError;
 
-Rules:
-1. You MUST respond in French as your primary language. Always write in French.
-2. Search the web using the available tool - 1 search max, up to 3 only if the first gave nothing useful
-3. Your response MUST never longer than 3 or 4 short sentences.
+/// Research a topic with web search.
+pub async fn research(llm_service: &LlmService, question: &str) -> Result<String, LlmError> {
+    let agent = llm_service
+        .build_search_agent(crate::agents::preambles::RESEARCH)
+        .await?;
 
-The user asked: "#;
-
-pub async fn research(question: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-    let model_name = crate::agents::model_name();
-    let openai_client = CompletionsClient::from_env();
-    let model = openai_client.completion_model(&model_name);
-
-    let transport = StreamableHttpClientTransport::from_uri("https://mcp.exa.ai/mcp");
-    let service = ClientInfo::default()
-        .serve(transport)
-        .await
-        .inspect_err(|e| tracing::error!("MCP client error: {:?}", e))?;
-
-    let tools = service.list_tools(Default::default()).await?;
-    tracing::info!(
-        "MCP tools available: {:?}",
-        tools.tools.iter().map(|t| &t.name).collect::<Vec<_>>()
-    );
-
-    let agent = rig::agent::AgentBuilder::new(model)
-        .preamble(PREAMBLE)
-        .rmcp_tools(tools.tools, service.peer().clone())
-        .build();
-
-    tracing::info!("Sending prompt to model for research...");
+    tracing::info!("Sending /research prompt to model...");
     let response = agent
         .prompt(question)
         .max_turns(4)
         .await
-        .inspect_err(|e| tracing::error!("Completion error: {:?}", e))?;
-    tracing::info!("Research response received: {} chars", response.len());
+        .map_err(|e| LlmError::Completion(e.to_string()))?;
+
+    tracing::info!("/research response received: {} chars", response.len());
     Ok(response)
 }
