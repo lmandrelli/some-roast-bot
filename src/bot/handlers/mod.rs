@@ -62,6 +62,12 @@ pub async fn event_handler(
             llm_service: Arc::clone(&data.llm_service),
         };
 
+        // Gate the typing indicator: only show it if a handler will actually respond.
+        // This restores the v0.2.x behaviour where the bot stayed silent on unrelated messages.
+        if !data.pipeline.has_match(&handler_ctx).await {
+            return Ok(());
+        }
+
         // Show typing indicator while generating response
         let typing = new_message.channel_id.start_typing(&ctx.http);
 
