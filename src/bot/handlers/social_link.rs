@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use poise::serenity_prelude::{CreateMessage, MessageFlags};
 
 use crate::bot::handler::{HandlerContext, MessageHandler};
 use crate::error::BotError;
@@ -40,10 +41,15 @@ impl MessageHandler for SocialLinkHandler {
             .collect::<Vec<_>>()
             .join(" ");
 
-        let header_text = format!("{} posted :", msg.author.name);
+        let header_text = format!("<@{}> posted :", msg.author.id);
 
         msg.channel_id
-            .say(&ctx.serenity_ctx.http, header_text)
+            .send_message(
+                &ctx.serenity_ctx.http,
+                CreateMessage::new()
+                    .content(header_text)
+                    .flags(MessageFlags::SUPPRESS_NOTIFICATIONS),
+            )
             .await?;
         msg.channel_id.say(&ctx.serenity_ctx.http, urls).await?;
 
