@@ -19,6 +19,22 @@ impl HandlerPipeline {
         self.handlers.push(handler);
     }
 
+    /// Check whether any handler in the pipeline is interested in this message.
+    /// This is a cheap filter (no side-effects, no I/O) used to decide whether
+    /// to show the "typing" indicator.
+    pub async fn has_match(&self, ctx: &crate::bot::handler::HandlerContext<'_>) -> bool {
+        let mut handlers: Vec<_> = self.handlers.iter().collect();
+        handlers.sort_by_key(|h| h.priority());
+
+        for handler in handlers {
+            if handler.can_handle(ctx).await {
+                return true;
+            }
+        }
+
+        false
+    }
+
     pub async fn run(
         &self,
         ctx: &crate::bot::handler::HandlerContext<'_>,
