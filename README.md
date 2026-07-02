@@ -1,6 +1,6 @@
 # some-roast-bot
 
-A sarcastic Discord bot that roasts users while answering their questions. Powered by an AI LLM (currently [Kimi K2.6](https://kimi.ai) served by [Chutes AI](https://chutes.ai)) with real-time web search via the [Exa MCP](https://exa.ai) server. All responses are in French.
+A sarcastic Discord bot that roasts users while answering their questions. Powered by an AI LLM (currently [MiMo-V2.5-Pro](https://mimo.xiaomi.com/mimo-v2-5-pro) served by [Xiaomi](https://mimo.xiaomi.com) via [OpenRouter](https://openrouter.ai)) with real-time web search via the [Exa MCP](https://exa.ai) server. All responses are in French.
 
 ---
 
@@ -43,7 +43,7 @@ A sarcastic Discord bot that roasts users while answering their questions. Power
 
 - [Rust](https://www.rust-lang.org/tools/install) (edition 2024)
 - A [Discord bot token](https://discord.com/developers/applications)
-- An OpenAI-compatible API key (the default uses [Chutes AI](https://chutes.ai))
+- An OpenAI-compatible API key (the default uses [OpenRouter](https://openrouter.ai))
 
 ---
 
@@ -77,9 +77,9 @@ cp .env.example .env
 | Variable         | Description                                             | Default                         |
 | ---------------- | ------------------------------------------------------- | ------------------------------- |
 | `DISCORD_TOKEN`  | Your Discord bot token                                  | *(required)*                    |
-| `OPENAI_API_KEY` | API key for the LLM provider (Chutes or OpenAI-compat.) | *(required)*                    |
-| `OPENAI_BASE_URL`| Base URL of the OpenAI-compatible API endpoint          | `https://llm.chutes.ai/v1`     |
-| `MODEL_NAME`     | LLM model identifier                                   | `moonshotai/Kimi-K2.5-TEE`     |
+| `OPENAI_API_KEY` | API key for the LLM provider (OpenRouter or OpenAI-compat.) | *(required)*                  |
+| `OPENAI_BASE_URL`| Base URL of the OpenAI-compatible API endpoint          | `https://openrouter.ai/api/v1` |
+| `MODEL_NAME`     | LLM model identifier (or `@preset/<slug>`)             | `@preset/mimo-v2-5-pro-on-xiaomi` |
 | `PROD`           | Production flag (`1` = prod, `0` = dev status display)  | `1`                             |
 | `MEMORY_DB_PATH` | Path to the SQLite memory database                      | `data/memory.db`                |
 

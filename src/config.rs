@@ -25,10 +25,10 @@ impl Config {
             .map_err(|_| ConfigError::MissingVar("OPENAI_API_KEY".into()))?;
 
         let openai_base_url = std::env::var("OPENAI_BASE_URL")
-            .unwrap_or_else(|_| "https://llm.chutes.ai/v1".to_string());
+            .unwrap_or_else(|_| "https://openrouter.ai/api/v1".to_string());
 
-        let model_name =
-            std::env::var("MODEL_NAME").unwrap_or_else(|_| "moonshotai/Kimi-K2.5-TEE".to_string());
+        let model_name = std::env::var("MODEL_NAME")
+            .unwrap_or_else(|_| "@preset/mimo-v2-5-pro-on-xiaomi".to_string());
 
         let is_prod = std::env::var("PROD").unwrap_or_default() != "0";
 
