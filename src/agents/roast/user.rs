@@ -11,13 +11,24 @@ pub async fn roast_user(
     target: &str,
     channel_ctx: &ChannelContext,
 ) -> Result<RoastOutput, LlmError> {
-    let prompt = format!(
-        "{channel_ctx}\n\
-         {tagger} wants you to roast {target}. \
-         Roast {target} based on what they said in the conversation."
-    );
-
     let trigger_content = channel_ctx.trigger.as_ref().map(|t| t.content.as_str());
+    let magic_active =
+        crate::agents::preambles::trigger_active(trigger_content, llm_service.magic_word());
+
+    let prompt = if magic_active {
+        format!(
+            "{channel_ctx}\n\
+             {tagger} mentioned you with {target}. \
+             Respond kindly to what {tagger} said — do NOT roast anyone."
+        )
+    } else {
+        format!(
+            "{channel_ctx}\n\
+             {tagger} wants you to roast {target}. \
+             Roast {target} based on what they said in the conversation."
+        )
+    };
+
     let preamble = crate::agents::preambles::select_preamble(
         crate::agents::preambles::ROAST_USER,
         trigger_content,

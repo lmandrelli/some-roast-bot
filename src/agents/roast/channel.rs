@@ -9,9 +9,19 @@ pub async fn roast_channel(
     llm_service: &LlmService,
     channel_ctx: &ChannelContext,
 ) -> Result<RoastOutput, LlmError> {
-    let prompt = format!("{}\n\nPick someone to roast.", channel_ctx.to_string());
-
     let trigger_content = channel_ctx.trigger.as_ref().map(|t| t.content.as_str());
+    let magic_active =
+        crate::agents::preambles::trigger_active(trigger_content, llm_service.magic_word());
+
+    let prompt = if magic_active {
+        format!(
+            "{}\n\nThe user triggered the easter egg. Respond warmly to their message.",
+            channel_ctx
+        )
+    } else {
+        format!("{}\n\nPick someone to roast.", channel_ctx)
+    };
+
     let preamble = crate::agents::preambles::select_preamble(
         crate::agents::preambles::ROAST_CHANNEL,
         trigger_content,

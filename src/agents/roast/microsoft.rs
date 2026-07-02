@@ -30,6 +30,9 @@ pub async fn roast_microsoft(
     };
 
     let trigger_content = channel_ctx.trigger.as_ref().map(|t| t.content.as_str());
+    let magic_active =
+        crate::agents::preambles::trigger_active(trigger_content, llm_service.magic_word());
+
     let base_preamble = crate::agents::preambles::select_preamble(
         crate::agents::preambles::ROAST_MICROSOFT,
         trigger_content,
@@ -38,11 +41,19 @@ pub async fn roast_microsoft(
 
     let preamble = format!("{}\n{}\n---\nContext:\n", base_preamble, topics_section);
 
-    let prompt = format!(
-        "{channel_ctx}\n\
-         {author} mentioned Microsoft or Windows. Destroy them. \
-         Remember: it's \"Microslop\" and \"Windaube\", always."
-    );
+    let prompt = if magic_active {
+        format!(
+            "{channel_ctx}\n\
+             {author} mentioned Microsoft or Windows. \
+             Respond to their message nicely — do NOT roast anyone."
+        )
+    } else {
+        format!(
+            "{channel_ctx}\n\
+             {author} mentioned Microsoft or Windows. Destroy them. \
+             Remember: it's \"Microslop\" and \"Windaube\", always."
+        )
+    };
 
     tracing::info!("Sending microsoft roast prompt to model...");
     let output = try_roast_with_retry(llm_service, &preamble, &prompt).await?;
