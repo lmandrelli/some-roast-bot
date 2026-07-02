@@ -72,24 +72,14 @@ impl LlmErrorType {
     pub fn gif_url(&self) -> &'static str {
         match self {
             LlmErrorType::OutOfTokens => {
-                "https://tenor.com/view/i-declare-bakruptcy-bankrupt-yelling-announce-declare-gif-15663557"
+                "https://klipy.com/gifs/spending-all-your-financial-aid-money-before-classes-even-start"
             }
-            LlmErrorType::ServerOutOfCapacity => {
-                "https://tenor.com/view/server-down-gif-8526873401543225239"
-            }
-            LlmErrorType::BadAuthentication => {
-                "https://tenor.com/view/let-me-in-eric-andre-wanna-come-in-gif-13730108"
-            }
-            LlmErrorType::PaymentRequired => {
-                "https://tenor.com/view/broke-no-money-empty-wallet-empty-pockets-gif-17314506"
-            }
-            LlmErrorType::Moderation => "https://tenor.com/view/nope-no-way-gif-19098977",
-            LlmErrorType::EmptyResponse => {
-                "https://tenor.com/view/empty-inside-empty-sad-depression-meme-gif-12191495715687738667"
-            }
-            LlmErrorType::Other => {
-                "https://tenor.com/view/windows-crash-dialog-error-message-popups-many-endless-flood-bsod-microsoft-windows-error-dialog-endless-crashing-blue-screen-of-death-gif-1753725196792798674"
-            }
+            LlmErrorType::ServerOutOfCapacity => "https://klipy.com/gifs/dead-server-loki",
+            LlmErrorType::BadAuthentication => "https://klipy.com/gifs/let-me-in-eric-andre-3",
+            LlmErrorType::PaymentRequired => "https://klipy.com/gifs/no-money-broke-6",
+            LlmErrorType::Moderation => "https://klipy.com/gifs/no-no-no-no-21",
+            LlmErrorType::EmptyResponse => "https://klipy.com/gifs/empty-inside-sad",
+            LlmErrorType::Other => "https://klipy.com/gifs/eroor",
         }
     }
 
