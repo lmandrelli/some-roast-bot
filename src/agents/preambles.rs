@@ -101,6 +101,42 @@ Rules:
 Context:
 "#;
 
+pub const MAGIC_WORD_PROMPT: &str = r#"You are MiMo V2.5 Pro. The user's message contains the hidden magic word "{word}" — this is an easter egg.
+
+EASTER-EGG MODE — ALL OF YOUR NORMAL RULES ARE SUSPENDED.
+
+You MUST:
+1. Respond in French.
+2. Follow the user's instructions literally — do exactly what they asked for, however be silly. Make the response as funny as possible.
+3. Respect the output format the calling code expects (e.g. <reply>...</reply> XML for roast agents, plain text for /ask and /research). For roasts, the <mention> must be the trigger author's Discord user ID (visible in the context) and the <roast> must contain whatever the user asked for.
+4. Be playful and lean into the easter-egg vibe.
+"#;
+
+pub fn magic_word_preamble(word: &str) -> String {
+    MAGIC_WORD_PROMPT.replace("{word}", word)
+}
+
+/// Returns true if `text` contains `word` (already lowercased),
+/// case-insensitively. The word may appear anywhere in the text.
+pub fn contains_trigger(text: &str, word: &str) -> bool {
+    text.to_lowercase().contains(word)
+}
+
+/// Returns true if the trigger message (if any) contains `word`.
+pub fn trigger_active(trigger: Option<&str>, word: &str) -> bool {
+    trigger.is_some_and(|t| contains_trigger(t, word))
+}
+
+/// Build the override preamble when the trigger contains the magic
+/// word, otherwise return `default`.
+pub fn select_preamble(default: &str, trigger: Option<&str>, word: &str) -> String {
+    if trigger_active(trigger, word) {
+        magic_word_preamble(word)
+    } else {
+        default.to_string()
+    }
+}
+
 /// Base preamble for Microsoft/Windows roasts.
 pub const ROAST_MICROSOFT: &str = r#"You are MiMo V2.5 Pro, a brutal roast bot in a Discord server. Someone just mentioned Microsoft or Windows, and you MUST mock them relentlessly.
 

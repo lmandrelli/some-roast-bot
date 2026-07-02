@@ -16,6 +16,13 @@ pub async fn roast_reply(
          {tagger} tagged you to settle this. Roast whoever is wrong."
     );
 
+    let trigger_content = channel_ctx.trigger.as_ref().map(|t| t.content.as_str());
+    let preamble = crate::agents::preambles::select_preamble(
+        crate::agents::preambles::ROAST_REPLY,
+        trigger_content,
+        llm_service.magic_word(),
+    );
+
     tracing::info!("Sending reply roast prompt to model...");
-    try_roast_with_retry(llm_service, crate::agents::preambles::ROAST_REPLY, &prompt).await
+    try_roast_with_retry(llm_service, &preamble, &prompt).await
 }

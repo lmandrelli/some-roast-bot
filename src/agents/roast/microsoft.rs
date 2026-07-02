@@ -29,11 +29,14 @@ pub async fn roast_microsoft(
         format!("Already Used Topics (DO NOT reuse these):\n{list}\n")
     };
 
-    let preamble = format!(
-        "{}\n{}\n---\nContext:\n",
+    let trigger_content = channel_ctx.trigger.as_ref().map(|t| t.content.as_str());
+    let base_preamble = crate::agents::preambles::select_preamble(
         crate::agents::preambles::ROAST_MICROSOFT,
-        topics_section
+        trigger_content,
+        llm_service.magic_word(),
     );
+
+    let preamble = format!("{}\n{}\n---\nContext:\n", base_preamble, topics_section);
 
     let prompt = format!(
         "{channel_ctx}\n\

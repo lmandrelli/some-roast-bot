@@ -6,13 +6,21 @@ use rmcp::{model::ClientInfo, service::ServiceExt, transport::StreamableHttpClie
 
 pub struct LlmService {
     model_name: String,
+    magic_word: String,
 }
 
 impl LlmService {
     pub fn new(config: &Config) -> Self {
         Self {
             model_name: config.model_name.clone(),
+            magic_word: config.magic_word.clone(),
         }
+    }
+
+    /// Magic word (already lowercased) that activates the easter-egg
+    /// override in every agent.
+    pub fn magic_word(&self) -> &str {
+        &self.magic_word
     }
 
     /// Build an agent with Exa MCP web-search tools.

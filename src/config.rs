@@ -8,6 +8,7 @@ pub struct Config {
     pub model_name: String,
     pub is_prod: bool,
     pub memory_db_path: PathBuf,
+    pub magic_word: String,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -36,6 +37,10 @@ impl Config {
             .map(PathBuf::from)
             .unwrap_or_else(|_| PathBuf::from("data/memory.db"));
 
+        let magic_word = std::env::var("MAGIC_WORD")
+            .unwrap_or_else(|_| "magic".to_string())
+            .to_lowercase();
+
         Ok(Config {
             discord_token,
             openai_api_key,
@@ -43,6 +48,7 @@ impl Config {
             model_name,
             is_prod,
             memory_db_path,
+            magic_word,
         })
     }
 }

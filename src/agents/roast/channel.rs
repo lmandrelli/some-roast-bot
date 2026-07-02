@@ -11,11 +11,13 @@ pub async fn roast_channel(
 ) -> Result<RoastOutput, LlmError> {
     let prompt = format!("{}\n\nPick someone to roast.", channel_ctx.to_string());
 
-    tracing::info!("Sending channel roast prompt to model...");
-    try_roast_with_retry(
-        llm_service,
+    let trigger_content = channel_ctx.trigger.as_ref().map(|t| t.content.as_str());
+    let preamble = crate::agents::preambles::select_preamble(
         crate::agents::preambles::ROAST_CHANNEL,
-        &prompt,
-    )
-    .await
+        trigger_content,
+        llm_service.magic_word(),
+    );
+
+    tracing::info!("Sending channel roast prompt to model...");
+    try_roast_with_retry(llm_service, &preamble, &prompt).await
 }

@@ -17,6 +17,13 @@ pub async fn roast_user(
          Roast {target} based on what they said in the conversation."
     );
 
+    let trigger_content = channel_ctx.trigger.as_ref().map(|t| t.content.as_str());
+    let preamble = crate::agents::preambles::select_preamble(
+        crate::agents::preambles::ROAST_USER,
+        trigger_content,
+        llm_service.magic_word(),
+    );
+
     tracing::info!("Sending user roast prompt to model...");
-    try_roast_with_retry(llm_service, crate::agents::preambles::ROAST_USER, &prompt).await
+    try_roast_with_retry(llm_service, &preamble, &prompt).await
 }
