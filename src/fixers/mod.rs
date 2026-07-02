@@ -62,3 +62,16 @@ pub fn should_translate(lang: Option<&str>) -> bool {
         None => false, // unknown language → don't guess
     }
 }
+
+/// Cheap content check: does `text` contain a transformed (fixed)
+/// social-media URL produced by this bot?
+///
+/// Used by the handler pipeline to recognise replies to the bot's own
+/// social-link reposts without making network calls.
+pub fn contains_fixed_link(text: &str) -> bool {
+    text.contains("fxtwitter.com")
+        || text.contains("fxbsky.app")
+        || text.contains("vxinstagram.com")
+        || text.contains("rxddit.com")
+        || text.contains("tnktok.com")
+}

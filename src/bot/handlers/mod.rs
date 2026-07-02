@@ -37,6 +37,23 @@ pub fn build_pipeline() -> HandlerPipeline {
     pipeline
 }
 
+/// Return `true` when the incoming message is a reply to one of the
+/// bot's own transformed social-link posts (either the `<@id> posted :`
+/// header or the fixed-URL message).
+///
+/// Used by the mention-based roast handlers to suppress their classic
+/// reply roasts when the conversation context is a reposted social link.
+pub fn is_reply_to_social_link(ctx: &HandlerContext<'_>) -> bool {
+    let Some(replied) = ctx.message.referenced_message.as_ref() else {
+        return false;
+    };
+    if replied.author.id != ctx.bot_id {
+        return false;
+    }
+    crate::fixers::contains_fixed_link(&replied.content)
+        || replied.content.trim().ends_with("posted :")
+}
+
 /// Poise event handler that listens for messages and dispatches through the handler pipeline.
 pub async fn event_handler(
     ctx: &serenity::Context,

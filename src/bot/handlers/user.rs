@@ -29,7 +29,20 @@ impl MessageHandler for UserHandler {
             .filter(|u| u.id != ctx.bot_id && !u.bot)
             .collect();
 
-        !other_mentions.is_empty()
+        if other_mentions.is_empty() {
+            return false;
+        }
+
+        if super::is_reply_to_social_link(ctx) {
+            tracing::info!(
+                "Handler '{}' ignored: reply to a transformed social link in channel {}",
+                self.name(),
+                ctx.message.channel_id
+            );
+            return false;
+        }
+
+        true
     }
 
     async fn handle(&self, ctx: &HandlerContext<'_>) -> Result<Option<String>, BotError> {

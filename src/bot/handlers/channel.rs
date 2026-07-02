@@ -18,7 +18,20 @@ impl MessageHandler for ChannelHandler {
     }
 
     async fn can_handle(&self, ctx: &HandlerContext<'_>) -> bool {
-        ctx.mentions_me
+        if !ctx.mentions_me {
+            return false;
+        }
+
+        if super::is_reply_to_social_link(ctx) {
+            tracing::info!(
+                "Handler '{}' ignored: reply to a transformed social link in channel {}",
+                self.name(),
+                ctx.message.channel_id
+            );
+            return false;
+        }
+
+        true
     }
 
     async fn handle(&self, ctx: &HandlerContext<'_>) -> Result<Option<String>, BotError> {
