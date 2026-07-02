@@ -4,6 +4,11 @@ use rig::client::{CompletionClient, ProviderClient};
 use rig::providers::openai::CompletionsClient;
 use rmcp::{model::ClientInfo, service::ServiceExt, transport::StreamableHttpClientTransport};
 
+/// Opaque handle to the running MCP session.
+/// Callers must hold this value alive for as long as the agent's tools
+/// might be invoked — dropping it closes the transport.
+pub type McpSession = rmcp::service::RunningService<rmcp::RoleClient, ClientInfo>;
+
 pub struct LlmService {
     model_name: String,
     magic_word: String,
@@ -25,10 +30,20 @@ impl LlmService {
 
     /// Build an agent with Exa MCP web-search tools.
     /// All roast agents get Exa access; behaviour is controlled via the preamble.
+    ///
+    /// Returns both the agent **and** the MCP session handle.  The session
+    /// **must** be kept alive (not dropped) for the entire duration of any
+    /// prompt call, otherwise tool calls will fail with "Transport closed".
     pub async fn build_agent(
         &self,
         preamble: &str,
-    ) -> Result<rig::agent::Agent<rig::providers::openai::CompletionModel>, LlmError> {
+    ) -> Result<
+        (
+            rig::agent::Agent<rig::providers::openai::CompletionModel>,
+            McpSession,
+        ),
+        LlmError,
+    > {
         let openai_client = CompletionsClient::from_env();
         let model = openai_client.completion_model(&self.model_name);
 
@@ -53,6 +68,6 @@ impl LlmService {
             .rmcp_tools(tools.tools, service.peer().clone())
             .build();
 
-        Ok(agent)
+        Ok((agent, service))
     }
 }

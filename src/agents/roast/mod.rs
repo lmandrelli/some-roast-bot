@@ -32,7 +32,7 @@ pub async fn try_roast_with_retry(
     preamble: &str,
     prompt: &str,
 ) -> Result<RoastOutput, LlmError> {
-    let agent = llm_service.build_agent(preamble).await?;
+    let (agent, _mcp_session) = llm_service.build_agent(preamble).await?;
 
     let mut previous_response = String::new();
     let mut last_error = String::new();

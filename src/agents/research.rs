@@ -11,7 +11,7 @@ pub async fn research(llm_service: &LlmService, question: &str) -> Result<String
         llm_service.magic_word(),
     );
 
-    let agent = llm_service.build_agent(&preamble).await?;
+    let (agent, _mcp_session) = llm_service.build_agent(&preamble).await?;
 
     tracing::info!("Sending /research prompt to model...");
     let response = agent
