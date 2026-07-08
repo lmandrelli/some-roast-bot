@@ -36,17 +36,18 @@ impl std::fmt::Display for Platform {
 
 /// Detect and rewrite every fixable link in `text`.
 ///
-/// Twitter and Bluesky calls are issued concurrently; the rest are synchronous.
+/// Network-backed fixers are issued concurrently; the rest are synchronous.
 pub async fn fix_links(text: &str) -> Vec<FixedLink> {
     let mut results = Vec::new();
 
     // Platforms that need an async API call (concurrent)
-    let (twitter_res, bluesky_res) = tokio::join!(twitter::fix(text), bluesky::fix(text),);
+    let (twitter_res, bluesky_res, instagram_res) =
+        tokio::join!(twitter::fix(text), bluesky::fix(text), instagram::fix(text),);
     results.extend(twitter_res);
     results.extend(bluesky_res);
+    results.extend(instagram_res);
 
     // Platforms that are pure regex rewrite (sync)
-    results.extend(instagram::fix(text));
     results.extend(reddit::fix(text));
     results.extend(tiktok::fix(text));
 
@@ -72,6 +73,8 @@ pub fn contains_fixed_link(text: &str) -> bool {
     text.contains("fxtwitter.com")
         || text.contains("fxbsky.app")
         || text.contains("vxinstagram.com")
+        || text.contains("instagram7.com")
+        || text.contains("kkinstagram.com")
         || text.contains("rxddit.com")
         || text.contains("tnktok.com")
 }
