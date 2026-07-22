@@ -1,7 +1,4 @@
-use base64::Engine as _;
-use image::AnimationDecoder as _;
 use std::collections::{HashMap, HashSet};
-use std::io::Cursor;
 
 use poise::serenity_prelude as serenity;
 
@@ -81,7 +78,6 @@ pub struct ChannelContext {
     pub channel_name: String,
     pub channel_description: Option<String>,
     pub messages: Vec<TranscriptMessage>,
-    pub visuals: Vec<Visual>,
 }
 
 impl ChannelContext {
@@ -266,7 +262,6 @@ pub async fn fetch_channel_context(
             visuals,
         });
     }
-    let visuals = prepare_visuals(prioritize_visuals(&messages)).await;
     let guild_name = guild_id
         .and_then(|id| ctx.cache.guild(id).map(|g| g.name.clone()))
         .unwrap_or_else(|| "Direct message".into());
@@ -294,7 +289,6 @@ pub async fn fetch_channel_context(
         channel_name,
         channel_description,
         messages,
-        visuals,
     })
 }
 
@@ -394,55 +388,6 @@ pub fn canonical_image_key(source_url: &str) -> String {
     }
 }
 
-async fn prepare_visuals(visuals: Vec<Visual>) -> Vec<Visual> {
-    const GIF_LIMIT: usize = 10 * 1024 * 1024;
-    const TOTAL_LIMIT: usize = 20 * 1024 * 1024;
-    let client = reqwest::Client::new();
-    let mut downloaded = 0usize;
-    let mut output = Vec::with_capacity(visuals.len());
-    for mut visual in visuals {
-        if visual.mime.as_deref() == Some("image/gif") && downloaded < TOTAL_LIMIT {
-            let request = async {
-                let response = client.get(&visual.url).send().await.ok()?;
-                if response
-                    .content_length()
-                    .is_some_and(|n| n > GIF_LIMIT as u64)
-                {
-                    return None;
-                }
-                let bytes = response.bytes().await.ok()?;
-                (bytes.len() <= GIF_LIMIT && downloaded + bytes.len() <= TOTAL_LIMIT)
-                    .then_some(bytes)
-            };
-            if let Ok(Some(bytes)) =
-                tokio::time::timeout(std::time::Duration::from_secs(5), request).await
-            {
-                downloaded += bytes.len();
-                if let Some(png) = gif_first_frame_png(&bytes) {
-                    visual = Visual {
-                        url: format!(
-                            "data:image/png;base64,{}",
-                            base64::engine::general_purpose::STANDARD.encode(png)
-                        ),
-                        mime: Some("image/png".into()),
-                    };
-                }
-            }
-        }
-        output.push(visual);
-    }
-    output
-}
-
-fn gif_first_frame_png(bytes: &[u8]) -> Option<Vec<u8>> {
-    let decoder = image::codecs::gif::GifDecoder::new(Cursor::new(bytes)).ok()?;
-    let frame = decoder.into_frames().next()?.ok()?;
-    let image = image::DynamicImage::ImageRgba8(frame.into_buffer());
-    let mut png = Cursor::new(Vec::new());
-    image.write_to(&mut png, image::ImageFormat::Png).ok()?;
-    Some(png.into_inner())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -488,11 +433,6 @@ mod tests {
         assert_eq!(result[0].url, "trigger");
         assert_eq!(result[1].url, "same");
         assert_eq!(result[2].url, "reply");
-    }
-
-    #[test]
-    fn invalid_gif_is_not_converted() {
-        assert!(gif_first_frame_png(b"not a gif").is_none());
     }
 
     #[test]
