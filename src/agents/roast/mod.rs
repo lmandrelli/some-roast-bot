@@ -5,14 +5,16 @@ pub use channel::roast_channel;
 pub use microsoft::roast_microsoft;
 pub use truth::roast_truth;
 
-use crate::{agents::llm::LlmService, bot::context::ChannelContext, error::LlmError};
+use crate::{
+    agents::llm::LlmService, bot::context::ChannelContext, db::MemoryRepository, error::LlmError,
+};
 use rig::{
     OneOrMany,
     completion::Prompt,
-    message::{DocumentSourceKind, Image, Message, UserContent},
+    message::{Message, UserContent},
 };
 use serde::Deserialize;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct RoastOutput {
@@ -21,35 +23,23 @@ pub struct RoastOutput {
     pub topic: Option<String>,
 }
 
-fn prompt_message(text: String, context: &ChannelContext, images: bool) -> Message {
-    let selected = crate::bot::context::prioritize_visuals(&context.messages);
-    let prepared = selected
-        .iter()
-        .map(|v| v.url.as_str())
-        .zip(context.visuals.iter())
-        .collect::<HashMap<_, _>>();
+fn prompt_message(
+    text: String,
+    context: &ChannelContext,
+    descriptions: &HashMap<String, String>,
+) -> Message {
     let mut content = vec![UserContent::text(format!(
         "{}\n{}",
         text,
         crate::bot::context::formatter::format_header(context)
     ))];
-    let mut emitted = HashSet::new();
     for message in &context.messages {
         content.push(UserContent::text(
-            crate::bot::context::formatter::format_transcript_message(message),
+            crate::bot::context::formatter::format_transcript_message_with_descriptions(
+                message,
+                descriptions,
+            ),
         ));
-        if images {
-            for visual in &message.visuals {
-                if emitted.insert(visual.url.as_str())
-                    && let Some(prepared) = prepared.get(visual.url.as_str())
-                {
-                    content.push(UserContent::Image(Image {
-                        data: DocumentSourceKind::Url(prepared.url.clone()),
-                        ..Default::default()
-                    }));
-                }
-            }
-        }
     }
     Message::User {
         content: OneOrMany::many(content).expect("prompt always has text"),
@@ -58,14 +48,15 @@ fn prompt_message(text: String, context: &ChannelContext, images: bool) -> Messa
 
 pub async fn try_roast_with_retry(
     llm: &LlmService,
+    memory: &dyn MemoryRepository,
     preamble: &str,
     prompt: &str,
     context: &ChannelContext,
 ) -> Result<RoastOutput, LlmError> {
+    let descriptions = crate::agents::vision::describe_context_visuals(llm, memory, context).await;
     let (agent, _session) = llm.build_agent(preamble).await?;
     let mut previous = String::new();
     let mut error = String::new();
-    let mut images = !context.visuals.is_empty();
     for attempt in 0..3 {
         let text = if error.is_empty() {
             prompt.to_string()
@@ -75,20 +66,11 @@ pub async fn try_roast_with_retry(
             )
         };
         let response = match agent
-            .prompt(prompt_message(text.clone(), context, images))
+            .prompt(prompt_message(text.clone(), context, &descriptions))
             .max_turns(4)
             .await
         {
             Ok(value) => value,
-            Err(e) if images => {
-                tracing::warn!("multimodal request failed; retrying once without images: {e}");
-                images = false;
-                agent
-                    .prompt(prompt_message(text, context, false))
-                    .max_turns(4)
-                    .await
-                    .map_err(|e| LlmError::Completion(e.to_string()))?
-            }
             Err(e) => return Err(LlmError::Completion(e.to_string())),
         };
         match parse_roast_response(&response) {

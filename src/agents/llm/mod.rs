@@ -11,6 +11,7 @@ pub type McpSession = rmcp::service::RunningService<rmcp::RoleClient, ClientInfo
 
 pub struct LlmService {
     model_name: String,
+    vision_model_name: String,
     magic_word: String,
 }
 
@@ -18,8 +19,20 @@ impl LlmService {
     pub fn new(config: &Config) -> Self {
         Self {
             model_name: config.model_name.clone(),
+            vision_model_name: config.vision_model_name.clone(),
             magic_word: config.magic_word.clone(),
         }
+    }
+
+    /// Build the isolated vision agent. It deliberately has no MCP tools.
+    pub fn build_vision_agent(
+        &self,
+        preamble: &str,
+    ) -> rig::agent::Agent<rig::providers::openai::CompletionModel> {
+        let client = CompletionsClient::from_env();
+        rig::agent::AgentBuilder::new(client.completion_model(&self.vision_model_name))
+            .preamble(preamble)
+            .build()
     }
 
     /// Magic word (already lowercased) that activates the easter-egg

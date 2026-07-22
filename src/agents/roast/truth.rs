@@ -8,6 +8,7 @@ use crate::{
 };
 pub async fn roast_truth(
     llm: &LlmService,
+    memory: &dyn crate::db::MemoryRepository,
     context: &ChannelContext,
 ) -> Result<RoastOutput, LlmError> {
     let trigger = context.trigger_content();
@@ -18,6 +19,7 @@ pub async fn roast_truth(
     );
     try_roast_with_retry(
         llm,
+        memory,
         &preamble,
         "Verify and answer the claim requested by the trigger.",
         context,

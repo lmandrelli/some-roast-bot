@@ -9,6 +9,7 @@ use crate::{
 
 pub async fn roast_channel(
     llm: &LlmService,
+    memory: &dyn crate::db::MemoryRepository,
     context: &ChannelContext,
 ) -> Result<RoastOutput, LlmError> {
     let trigger = context.trigger_content();
@@ -22,5 +23,5 @@ pub async fn roast_channel(
     } else {
         "Inspect the trigger first and fulfill its roast intent. A target may be a guild member, external person, object, image, or idea. A mention or reply is context, not necessarily the target. If no target is requested, choose the most roastable subject from context."
     };
-    try_roast_with_retry(llm, &preamble, intent, context).await
+    try_roast_with_retry(llm, memory, &preamble, intent, context).await
 }

@@ -6,6 +6,7 @@ pub struct Config {
     pub openai_api_key: String,
     pub openai_base_url: String,
     pub model_name: String,
+    pub vision_model_name: String,
     pub is_prod: bool,
     pub memory_db_path: PathBuf,
     pub magic_word: String,
@@ -30,6 +31,8 @@ impl Config {
 
         let model_name = std::env::var("MODEL_NAME")
             .unwrap_or_else(|_| "@preset/mimo-v2-5-pro-on-xiaomi".to_string());
+        let vision_model_name = std::env::var("VISION_MODEL_NAME")
+            .unwrap_or_else(|_| "@preset/mimo-v2-5-on-xiaomi".to_string());
 
         let is_prod = std::env::var("PROD").unwrap_or_default() != "0";
 
@@ -46,6 +49,7 @@ impl Config {
             openai_api_key,
             openai_base_url,
             model_name,
+            vision_model_name,
             is_prod,
             memory_db_path,
             magic_word,

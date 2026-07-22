@@ -4,6 +4,17 @@ use crate::error::DbError;
 
 /// Repository for bot memory / statistics storage.
 pub trait MemoryRepository: Send + Sync {
+    /// Return a cached image description, if any.
+    fn image_description(&self, canonical_key: &str) -> Result<Option<String>, DbError>;
+
+    /// Insert or replace an image description.
+    fn remember_image_description(
+        &self,
+        canonical_key: &str,
+        source_url: &str,
+        description: &str,
+    ) -> Result<(), DbError>;
+
     /// Record a roast event.
     fn record_roast(
         &self,

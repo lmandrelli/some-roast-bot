@@ -80,6 +80,7 @@ cp .env.example .env
 | `OPENAI_API_KEY` | API key for the LLM provider (OpenRouter or OpenAI-compat.) | *(required)*                  |
 | `OPENAI_BASE_URL`| Base URL of the OpenAI-compatible API endpoint          | `https://openrouter.ai/api/v1` |
 | `MODEL_NAME`     | LLM model identifier (or `@preset/<slug>`)             | `@preset/mimo-v2-5-pro-on-xiaomi` |
+| `VISION_MODEL_NAME` | Vision model used to describe images before roasts   | `@preset/mimo-v2-5-on-xiaomi` |
 | `PROD`           | Production flag (`1` = prod, `0` = dev status display)  | `1`                             |
 | `MEMORY_DB_PATH` | Path to the SQLite memory database                      | `data/memory.db`                |
 

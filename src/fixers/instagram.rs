@@ -84,7 +84,10 @@ async fn first_working_url(client: &reqwest::Client, urls: &[String]) -> Option<
         }
     }
 
-    tracing::warn!("No Instagram embed provider passed preflight for {:?}", urls);
+    tracing::warn!(
+        "No Instagram embed provider passed preflight for {:?}",
+        urls
+    );
     None
 }
 
@@ -121,12 +124,18 @@ mod tests {
         let links = extract_links("https://www.instagram.com/reel/ABC_123-");
 
         assert_eq!(links.len(), 1);
-        assert_eq!(links[0].candidates[0], "https://vxinstagram.com/reel/ABC_123-");
+        assert_eq!(
+            links[0].candidates[0],
+            "https://vxinstagram.com/reel/ABC_123-"
+        );
         assert_eq!(
             links[0].candidates[1],
             "https://www.instagram7.com/reel/ABC_123-"
         );
-        assert_eq!(links[0].candidates[2], "https://kkinstagram.com/reel/ABC_123-");
+        assert_eq!(
+            links[0].candidates[2],
+            "https://kkinstagram.com/reel/ABC_123-"
+        );
     }
 
     #[test]

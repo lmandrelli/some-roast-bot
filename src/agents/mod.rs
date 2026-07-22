@@ -2,6 +2,7 @@ mod ask;
 mod preambles;
 mod research;
 mod roast;
+mod vision;
 
 pub mod llm;
 

@@ -49,6 +49,13 @@ impl SqliteMemoryRepository {
                 count        INTEGER NOT NULL DEFAULT 1,
                 UNIQUE(triggerer_id, target_id, roast_type)
             );
+
+            CREATE TABLE IF NOT EXISTS image_descriptions (
+                canonical_key TEXT PRIMARY KEY,
+                source_url    TEXT NOT NULL,
+                description   TEXT NOT NULL,
+                created_at    TEXT NOT NULL
+            );
             ",
         )
         .map_err(DbError)?;
@@ -62,6 +69,41 @@ impl SqliteMemoryRepository {
 }
 
 impl MemoryRepository for SqliteMemoryRepository {
+    fn image_description(&self, canonical_key: &str) -> Result<Option<String>, DbError> {
+        let guard = self.conn.lock().unwrap();
+        let mut stmt =
+            guard.prepare("SELECT description FROM image_descriptions WHERE canonical_key = ?1")?;
+        match stmt.query_row([canonical_key], |row| row.get(0)) {
+            Ok(value) => Ok(Some(value)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(error) => Err(DbError(error)),
+        }
+    }
+
+    fn remember_image_description(
+        &self,
+        canonical_key: &str,
+        source_url: &str,
+        description: &str,
+    ) -> Result<(), DbError> {
+        let guard = self.conn.lock().unwrap();
+        guard.execute(
+            "INSERT INTO image_descriptions (canonical_key, source_url, description, created_at)
+             VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(canonical_key) DO UPDATE SET
+               source_url = excluded.source_url,
+               description = excluded.description,
+               created_at = excluded.created_at",
+            (
+                canonical_key,
+                source_url,
+                description,
+                Utc::now().to_rfc3339(),
+            ),
+        )?;
+        Ok(())
+    }
+
     fn record_roast(
         &self,
         triggerer_id: &str,
@@ -194,5 +236,35 @@ impl MemoryRepository for SqliteMemoryRepository {
             .collect();
 
         Ok(results)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn image_description_table_supports_miss_round_trip_and_upsert() {
+        let path = std::env::temp_dir().join(format!(
+            "some-roast-bot-image-cache-{}-{}.sqlite",
+            std::process::id(),
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        let repository = SqliteMemoryRepository::new(&path).unwrap();
+        assert_eq!(repository.image_description("key").unwrap(), None);
+        repository
+            .remember_image_description("key", "https://source/one", "première")
+            .unwrap();
+        assert_eq!(
+            repository.image_description("key").unwrap().as_deref(),
+            Some("première")
+        );
+        repository
+            .remember_image_description("key", "https://source/two", "mise à jour")
+            .unwrap();
+        assert_eq!(
+            repository.image_description("key").unwrap().as_deref(),
+            Some("mise à jour")
+        );
     }
 }

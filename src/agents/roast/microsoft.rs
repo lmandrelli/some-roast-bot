@@ -54,7 +54,7 @@ pub async fn roast_microsoft(
     };
 
     tracing::info!("Sending microsoft roast prompt to model...");
-    let output = try_roast_with_retry(llm_service, &preamble, &prompt, channel_ctx).await?;
+    let output = try_roast_with_retry(llm_service, memory, &preamble, &prompt, channel_ctx).await?;
 
     if let Some(ref topic) = output.topic {
         tracing::info!("Storing microsoft news topic: {topic}");

@@ -377,6 +377,23 @@ pub fn prioritize_visuals(messages: &[TranscriptMessage]) -> Vec<Visual> {
     out
 }
 
+pub fn canonical_image_key(source_url: &str) -> String {
+    let Ok(mut url) = url::Url::parse(source_url) else {
+        return source_url.to_owned();
+    };
+    let is_discord_cdn = matches!(
+        url.host_str(),
+        Some("cdn.discordapp.com" | "media.discordapp.net")
+    );
+    if is_discord_cdn {
+        url.set_query(None);
+        url.set_fragment(None);
+        url.to_string()
+    } else {
+        source_url.to_owned()
+    }
+}
+
 async fn prepare_visuals(visuals: Vec<Visual>) -> Vec<Visual> {
     const GIF_LIMIT: usize = 10 * 1024 * 1024;
     const TOTAL_LIMIT: usize = 20 * 1024 * 1024;
@@ -476,5 +493,42 @@ mod tests {
     #[test]
     fn invalid_gif_is_not_converted() {
         assert!(gif_first_frame_png(b"not a gif").is_none());
+    }
+
+    #[test]
+    fn canonicalizes_only_discord_cdn_urls() {
+        assert_eq!(
+            canonical_image_key("https://cdn.discordapp.com/attachments/1/a.png?ex=1&is=2#x"),
+            "https://cdn.discordapp.com/attachments/1/a.png"
+        );
+        let external = "https://example.com/a.png?token=1#frame";
+        assert_eq!(canonical_image_key(external), external);
+    }
+
+    #[test]
+    fn transcript_places_description_on_owner_and_omits_visual_url() {
+        let url = "https://cdn.discordapp.com/attachments/1/cat.png?ex=signed";
+        let mut owner = message(1, false, false, &[url]);
+        owner.attachments.push(AttachmentData {
+            filename: "cat.png".into(),
+            description: None,
+            content_type: Some("image/png".into()),
+            size: 42,
+            width: Some(10),
+            height: Some(10),
+            url: url.into(),
+        });
+        let descriptions =
+            HashMap::from([(canonical_image_key(url), "Un chat devant un écran".into())]);
+        let formatted =
+            formatter::format_transcript_message_with_descriptions(&owner, &descriptions);
+        assert!(formatted.contains("visual_description: Un chat devant un écran"));
+        assert!(!formatted.contains(url));
+
+        let other = formatter::format_transcript_message_with_descriptions(
+            &message(2, false, false, &[]),
+            &descriptions,
+        );
+        assert!(!other.contains("Un chat devant un écran"));
     }
 }
