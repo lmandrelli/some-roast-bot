@@ -11,18 +11,14 @@ use crate::error::BotError;
 mod channel;
 mod microsoft;
 mod quoi;
-mod reply;
 mod social_link;
 mod truth;
-mod user;
 
 use channel::ChannelHandler;
 use microsoft::MicrosoftHandler;
 use quoi::QuoiHandler;
-use reply::ReplyHandler;
 use social_link::SocialLinkHandler;
 use truth::TruthHandler;
-use user::UserHandler;
 
 /// Build the default handler pipeline.
 pub fn build_pipeline() -> HandlerPipeline {
@@ -31,8 +27,6 @@ pub fn build_pipeline() -> HandlerPipeline {
     pipeline.register(Box::new(QuoiHandler));
     pipeline.register(Box::new(MicrosoftHandler));
     pipeline.register(Box::new(TruthHandler));
-    pipeline.register(Box::new(ReplyHandler));
-    pipeline.register(Box::new(UserHandler));
     pipeline.register(Box::new(ChannelHandler));
     pipeline
 }
@@ -96,8 +90,11 @@ pub async fn event_handler(
         match result {
             Ok(Some(response)) => {
                 if !response.is_empty() {
-                    let response = utils::strip_self_mentions(ctx, &response).await;
-                    utils::send_roast(ctx, new_message.channel_id, &response).await?;
+                    let safe =
+                        utils::sanitize_mentions(ctx, new_message.guild_id, bot_id, &response)
+                            .await;
+                    utils::send_roast(ctx, new_message.channel_id, &safe.text, &safe.allowed_users)
+                        .await?;
                 }
             }
             Ok(None) => {

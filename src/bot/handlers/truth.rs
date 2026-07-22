@@ -38,18 +38,14 @@ impl MessageHandler for TruthHandler {
         );
 
         let channel_ctx =
-            context::fetch_channel_context(ctx.serenity_ctx, msg.channel_id, msg, true).await?;
+            context::fetch_channel_context(ctx.serenity_ctx, msg.channel_id, msg).await?;
 
         let output = crate::agents::roast_truth(&ctx.llm_service, &channel_ctx).await?;
 
         ctx.memory
-            .record_roast(
-                &msg.author.id.to_string(),
-                Some(&output.mention_id),
-                "truth",
-            )
+            .record_roast(&msg.author.id.to_string(), None, "truth")
             .map_err(|e| BotError::Db(e))?;
 
-        Ok(Some(format!("<@{}> {}", output.mention_id, output.roast)))
+        Ok(Some(output.response))
     }
 }

@@ -1,33 +1,26 @@
-use crate::agents::llm::LlmService;
-use crate::agents::roast::{RoastOutput, try_roast_with_retry};
-use crate::bot::context::ChannelContext;
-use crate::error::LlmError;
+use crate::{
+    agents::{
+        llm::LlmService,
+        roast::{RoastOutput, try_roast_with_retry},
+    },
+    bot::context::ChannelContext,
+    error::LlmError,
+};
 
-/// Roast based on recent channel messages.
-/// The bot picks who to roast and mentions them.
 pub async fn roast_channel(
-    llm_service: &LlmService,
-    channel_ctx: &ChannelContext,
+    llm: &LlmService,
+    context: &ChannelContext,
 ) -> Result<RoastOutput, LlmError> {
-    let trigger_content = channel_ctx.trigger.as_ref().map(|t| t.content.as_str());
-    let magic_active =
-        crate::agents::preambles::trigger_active(trigger_content, llm_service.magic_word());
-
-    let prompt = if magic_active {
-        format!(
-            "{}\n\nThe user triggered the easter egg. Respond warmly to their message.",
-            channel_ctx
-        )
-    } else {
-        format!("{}\n\nPick someone to roast.", channel_ctx)
-    };
-
+    let trigger = context.trigger_content();
     let preamble = crate::agents::preambles::select_preamble(
-        crate::agents::preambles::ROAST_CHANNEL,
-        trigger_content,
-        llm_service.magic_word(),
+        crate::agents::preambles::ROAST_GENERAL,
+        trigger,
+        llm.magic_word(),
     );
-
-    tracing::info!("Sending channel roast prompt to model...");
-    try_roast_with_retry(llm_service, &preamble, &prompt).await
+    let intent = if crate::agents::preambles::trigger_active(trigger, llm.magic_word()) {
+        "The easter egg is active. Respond warmly to the trigger and do not roast."
+    } else {
+        "Inspect the trigger first and fulfill its roast intent. A target may be a guild member, external person, object, image, or idea. A mention or reply is context, not necessarily the target. If no target is requested, choose the most roastable subject from context."
+    };
+    try_roast_with_retry(llm, &preamble, intent, context).await
 }

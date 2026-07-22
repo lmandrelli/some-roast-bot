@@ -1,126 +1,153 @@
 mod channel;
 mod microsoft;
-mod reply;
 mod truth;
-mod user;
-
 pub use channel::roast_channel;
 pub use microsoft::roast_microsoft;
-pub use reply::roast_reply;
 pub use truth::roast_truth;
-pub use user::roast_user;
 
-use rig::completion::Prompt;
+use crate::{agents::llm::LlmService, bot::context::ChannelContext, error::LlmError};
+use rig::{
+    OneOrMany,
+    completion::Prompt,
+    message::{DocumentSourceKind, Image, Message, UserContent},
+};
+use serde::Deserialize;
+use std::collections::{HashMap, HashSet};
 
-use crate::agents::llm::LlmService;
-use crate::error::LlmError;
-
-/// Structured output from any roast agent.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct RoastOutput {
-    pub mention_id: String,
-    pub roast: String,
+    pub response: String,
+    #[serde(default)]
     pub topic: Option<String>,
 }
 
-/// Call an agent with the given preamble and prompt, retrying up to 2
-/// times if the response does not contain valid XML.  On retry the
-/// LLM receives its previous response plus the parse error so it can
-/// correct itself.
-pub async fn try_roast_with_retry(
-    llm_service: &LlmService,
-    preamble: &str,
-    prompt: &str,
-) -> Result<RoastOutput, LlmError> {
-    let (agent, _mcp_session) = llm_service.build_agent(preamble).await?;
-
-    let mut previous_response = String::new();
-    let mut last_error = String::new();
-
-    for attempt in 0..3 {
-        let full_prompt = if last_error.is_empty() {
-            prompt.to_string()
-        } else {
-            format!(
-                "{prompt}\n\n---\nPARSE ERROR — your previous response was invalid and could not be processed.\n\nYour previous response:\n```\n{previous_response}\n```\n\nWhy it failed: {last_error}\n\nYou MUST fix this exact issue and output ONLY valid XML in the exact format specified in your instructions."
-            )
-        };
-
-        let response = agent
-            .prompt(&full_prompt)
-            .max_turns(4)
-            .await
-            .map_err(|e| LlmError::Completion(e.to_string()))?;
-
-        match parse_roast_response(&response) {
-            Ok(output) => return Ok(output),
-            Err(e) => {
-                tracing::warn!("Roast parse failed (attempt {}): {}", attempt + 1, e);
-                previous_response = response;
-                last_error = e.to_string();
+fn prompt_message(text: String, context: &ChannelContext, images: bool) -> Message {
+    let selected = crate::bot::context::prioritize_visuals(&context.messages);
+    let prepared = selected
+        .iter()
+        .map(|v| v.url.as_str())
+        .zip(context.visuals.iter())
+        .collect::<HashMap<_, _>>();
+    let mut content = vec![UserContent::text(format!(
+        "{}\n{}",
+        text,
+        crate::bot::context::formatter::format_header(context)
+    ))];
+    let mut emitted = HashSet::new();
+    for message in &context.messages {
+        content.push(UserContent::text(
+            crate::bot::context::formatter::format_transcript_message(message),
+        ));
+        if images {
+            for visual in &message.visuals {
+                if emitted.insert(visual.url.as_str())
+                    && let Some(prepared) = prepared.get(visual.url.as_str())
+                {
+                    content.push(UserContent::Image(Image {
+                        data: DocumentSourceKind::Url(prepared.url.clone()),
+                        ..Default::default()
+                    }));
+                }
             }
         }
     }
+    Message::User {
+        content: OneOrMany::many(content).expect("prompt always has text"),
+    }
+}
 
+pub async fn try_roast_with_retry(
+    llm: &LlmService,
+    preamble: &str,
+    prompt: &str,
+    context: &ChannelContext,
+) -> Result<RoastOutput, LlmError> {
+    let (agent, _session) = llm.build_agent(preamble).await?;
+    let mut previous = String::new();
+    let mut error = String::new();
+    let mut images = !context.visuals.is_empty();
+    for attempt in 0..3 {
+        let text = if error.is_empty() {
+            prompt.to_string()
+        } else {
+            format!(
+                "{prompt}\n\nYour previous output was invalid:\n```\n{previous}\n```\nValidation error: {error}\nReturn ONLY corrected JSON with a non-empty response string and optional topic string."
+            )
+        };
+        let response = match agent
+            .prompt(prompt_message(text.clone(), context, images))
+            .max_turns(4)
+            .await
+        {
+            Ok(value) => value,
+            Err(e) if images => {
+                tracing::warn!("multimodal request failed; retrying once without images: {e}");
+                images = false;
+                agent
+                    .prompt(prompt_message(text, context, false))
+                    .max_turns(4)
+                    .await
+                    .map_err(|e| LlmError::Completion(e.to_string()))?
+            }
+            Err(e) => return Err(LlmError::Completion(e.to_string())),
+        };
+        match parse_roast_response(&response) {
+            Ok(out) => return Ok(out),
+            Err(e) => {
+                tracing::warn!("roast JSON parse failed (attempt {}): {e}", attempt + 1);
+                previous = response;
+                error = e.to_string();
+            }
+        }
+    }
     Err(LlmError::Parse(
-        "Failed to parse roast after 3 attempts".to_string(),
+        "Failed to parse roast JSON after 3 attempts".into(),
     ))
 }
 
-/// Parse the XML response every roast agent is required to emit.
-/// Expected format:
-///   <reply>
-///     <mention>{DISCORD_USER_ID}</mention>
-///     <roast>{text}</roast>
-///     <topic>{optional}</topic>
-///   </reply>
 pub fn parse_roast_response(raw: &str) -> Result<RoastOutput, LlmError> {
-    let mention = extract_tag(raw, "mention")
-        .ok_or_else(|| {
-            LlmError::Parse(
-                "The response is missing the `<mention>` tag. It must contain a Discord user ID (e.g. 123456789).".to_string(),
-            )
-        })?;
-    let roast = extract_tag(raw, "roast").ok_or_else(|| {
-        LlmError::Parse(
-            "The response is missing the `<roast>` tag. It must contain the roast text."
-                .to_string(),
-        )
-    })?;
-    let topic = extract_tag(raw, "topic");
-
-    let mention = mention.trim();
-    if mention.is_empty() {
+    let trimmed = raw.trim();
+    let json = if trimmed.starts_with("```json") {
+        trimmed
+            .trim_start_matches("```json")
+            .trim_end_matches("```")
+            .trim()
+    } else if trimmed.starts_with("```") {
+        trimmed.trim_matches('`').trim()
+    } else {
+        trimmed
+    };
+    let output: RoastOutput =
+        serde_json::from_str(json).map_err(|e| LlmError::Parse(format!("invalid JSON: {e}")))?;
+    if output.response.trim().is_empty() {
         return Err(LlmError::Parse(
-            "The `<mention>` tag is present but empty. It must contain a valid Discord user ID."
-                .to_string(),
+            "response must be a non-empty string".into(),
         ));
     }
-    if !mention.chars().all(|c| c.is_ascii_digit()) {
-        return Err(LlmError::Parse(
-            "The `<mention>` tag must contain a valid numeric Discord user ID.".to_string(),
-        ));
-    }
-    if roast.trim().is_empty() {
-        return Err(LlmError::Parse(
-            "The `<roast>` tag is present but empty. It must contain the roast text.".to_string(),
-        ));
-    }
-
     Ok(RoastOutput {
-        mention_id: mention.trim().to_string(),
-        roast: roast.trim().to_string(),
-        topic: topic.map(|s| s.trim().to_string()),
+        response: output.response.trim().into(),
+        topic: output
+            .topic
+            .map(|x| x.trim().to_string())
+            .filter(|x| !x.is_empty()),
     })
 }
 
-fn extract_tag<'a>(text: &'a str, tag: &str) -> Option<&'a str> {
-    let open = format!("<{tag}>");
-    let close = format!("</{tag}>");
-    let start = text.find(&open)? + open.len();
-    let end = text.find(&close)?;
-    if end <= start {
-        return None;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn parses_json_contract() {
+        assert_eq!(
+            parse_roast_response(r#"{"response":"salut","topic":"news"}"#).unwrap(),
+            RoastOutput {
+                response: "salut".into(),
+                topic: Some("news".into())
+            }
+        );
     }
-    Some(&text[start..end])
+    #[test]
+    fn rejects_missing_response() {
+        assert!(parse_roast_response(r#"{"topic":"x"}"#).is_err());
+    }
 }

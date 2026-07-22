@@ -40,14 +40,14 @@ impl MessageHandler for ChannelHandler {
 
         let triggerer_id = msg.author.id.to_string();
         let channel_ctx =
-            context::fetch_channel_context(ctx.serenity_ctx, msg.channel_id, msg, true).await?;
+            context::fetch_channel_context(ctx.serenity_ctx, msg.channel_id, msg).await?;
 
         let output = crate::agents::roast_channel(&ctx.llm_service, &channel_ctx).await?;
 
         ctx.memory
-            .record_roast(&triggerer_id, Some(&output.mention_id), "channel")
+            .record_roast(&triggerer_id, None, "general")
             .map_err(|e| BotError::Db(e))?;
 
-        Ok(Some(format!("<@{}> {}", output.mention_id, output.roast)))
+        Ok(Some(output.response))
     }
 }
