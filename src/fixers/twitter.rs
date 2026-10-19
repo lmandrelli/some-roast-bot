@@ -5,10 +5,18 @@ use regex::Regex;
 static API_BASE: &str = "https://api.fxtwitter.com";
 static FIX_BASE: &str = "https://fxtwitter.com";
 
+fn link_regex() -> Regex {
+    Regex::new(r#"https?://(?:www\.)?(?:twitter\.com|x\.com)/([\w_]+)/status/(\d+)"#).unwrap()
+}
+
+/// Cheap check (no network): does `text` contain a Twitter/X link?
+pub fn detect(text: &str) -> bool {
+    link_regex().is_match(text)
+}
+
 /// Extract Twitter/X links and rewrite them with smart translation.
 pub async fn fix(text: &str) -> Vec<FixedLink> {
-    let re =
-        Regex::new(r#"https?://(?:www\.)?(?:twitter\.com|x\.com)/([\w_]+)/status/(\d+)"#).unwrap();
+    let re = link_regex();
 
     let mut results = Vec::new();
 

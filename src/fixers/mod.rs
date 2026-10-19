@@ -13,6 +13,27 @@ pub struct FixedLink {
     pub translated: bool,
 }
 
+/// A link we recognised but could not turn into a working embed.
+#[derive(Debug, Clone)]
+pub struct FailedLink {
+    pub platform: Platform,
+    pub original_url: String,
+    pub reason: String,
+}
+
+/// Result of [`fix_links`]: rewritten links plus the ones that failed.
+#[derive(Debug, Default)]
+pub struct FixOutcome {
+    pub fixed: Vec<FixedLink>,
+    pub failed: Vec<FailedLink>,
+}
+
+impl FixOutcome {
+    pub fn is_empty(&self) -> bool {
+        self.fixed.is_empty() && self.failed.is_empty()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Platform {
     Twitter,
@@ -34,24 +55,34 @@ impl std::fmt::Display for Platform {
     }
 }
 
+/// Cheap check (regex only, no network): does `text` contain a link we know how to fix?
+pub fn has_fixable_link(text: &str) -> bool {
+    twitter::detect(text)
+        || bluesky::detect(text)
+        || instagram::detect(text)
+        || !reddit::fix(text).is_empty()
+        || !tiktok::fix(text).is_empty()
+}
+
 /// Detect and rewrite every fixable link in `text`.
 ///
 /// Network-backed fixers are issued concurrently; the rest are synchronous.
-pub async fn fix_links(text: &str) -> Vec<FixedLink> {
-    let mut results = Vec::new();
+pub async fn fix_links(text: &str) -> FixOutcome {
+    let mut outcome = FixOutcome::default();
 
     // Platforms that need an async API call (concurrent)
-    let (twitter_res, bluesky_res, instagram_res) =
+    let (twitter_res, bluesky_res, (instagram_fixed, instagram_failed)) =
         tokio::join!(twitter::fix(text), bluesky::fix(text), instagram::fix(text),);
-    results.extend(twitter_res);
-    results.extend(bluesky_res);
-    results.extend(instagram_res);
+    outcome.fixed.extend(twitter_res);
+    outcome.fixed.extend(bluesky_res);
+    outcome.fixed.extend(instagram_fixed);
+    outcome.failed.extend(instagram_failed);
 
     // Platforms that are pure regex rewrite (sync)
-    results.extend(reddit::fix(text));
-    results.extend(tiktok::fix(text));
+    outcome.fixed.extend(reddit::fix(text));
+    outcome.fixed.extend(tiktok::fix(text));
 
-    results
+    outcome
 }
 
 /// Return `true` if the language code indicates we *should* append `/fr`.

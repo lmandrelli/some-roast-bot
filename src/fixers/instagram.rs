@@ -1,4 +1,4 @@
-use super::{FixedLink, Platform};
+use super::{FailedLink, FixedLink, Platform};
 use regex::Regex;
 use std::time::Duration;
 
@@ -22,32 +22,60 @@ const UNCONDITIONAL_FALLBACK_BASE: &str = "https://kkinstagram.com";
 const DISCORDBOT_USER_AGENT: &str =
     "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)";
 
+/// Cheap check (no network): does `text` contain an Instagram link we know how to fix?
+pub fn detect(text: &str) -> bool {
+    !extract_links(text).is_empty()
+}
+
 /// Extract Instagram links and rewrite them to the first provider that looks embeddable.
-pub async fn fix(text: &str) -> Vec<FixedLink> {
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(3))
-        .build()
-        .ok();
-
-    let mut results = Vec::new();
-
-    for link in extract_links(text) {
-        let Some(fixed_url) = (match &client {
-            Some(client) => first_working_url(client, &link.candidates).await,
-            None => None,
-        }) else {
-            continue;
-        };
-
-        results.push(FixedLink {
-            platform: Platform::Instagram,
-            original_url: link.original_url,
-            fixed_url,
-            translated: false,
-        });
+///
+/// Links for which no provider passes the preflight are returned as failures
+/// so the caller can tell the user instead of silently dropping them.
+pub async fn fix(text: &str) -> (Vec<FixedLink>, Vec<FailedLink>) {
+    let links = extract_links(text);
+    if links.is_empty() {
+        return (Vec::new(), Vec::new());
     }
 
-    results
+    let client = match reqwest::Client::builder()
+        .timeout(Duration::from_secs(3))
+        .build()
+    {
+        Ok(client) => client,
+        Err(e) => {
+            tracing::error!("Failed to build Instagram HTTP client: {}", e);
+            let failed = links
+                .into_iter()
+                .map(|link| FailedLink {
+                    platform: Platform::Instagram,
+                    original_url: link.original_url,
+                    reason: format!("HTTP client error: {e}"),
+                })
+                .collect();
+            return (Vec::new(), failed);
+        }
+    };
+
+    let mut fixed = Vec::new();
+    let mut failed = Vec::new();
+
+    for link in links {
+        match first_working_url(&client, &link.candidates).await {
+            Ok(fixed_url) => fixed.push(FixedLink {
+                platform: Platform::Instagram,
+                original_url: link.original_url,
+                fixed_url,
+                translated: false,
+            }),
+            Err(reason) => failed.push(FailedLink {
+                platform: Platform::Instagram,
+                original_url: link.original_url,
+                reason,
+            }),
+        }
+    }
+
+    (fixed, failed)
 }
 
 #[derive(Debug)]
@@ -57,8 +85,9 @@ struct InstagramLink {
 }
 
 fn extract_links(text: &str) -> Vec<InstagramLink> {
+    // Instagram now also emits `instagram.com/<username>/reel/<code>` and `/reels/<code>`.
     let re = Regex::new(
-        r#"https?://(?:www\.)?(?:instagram\.com/(p|reel|tv)/([\w-]+)|instagr\.am/p/([\w-]+))"#,
+        r#"https?://(?:www\.)?(?:instagram\.com/(?:[\w.]+/)?(p|reels?|tv)/([\w-]+)|instagr\.am/p/([\w-]+))"#,
     )
     .unwrap();
 
@@ -66,7 +95,11 @@ fn extract_links(text: &str) -> Vec<InstagramLink> {
 
     for caps in re.captures_iter(text) {
         let original = caps.get(0).unwrap().as_str().to_string();
-        let route = caps.get(1).map(|m| m.as_str()).unwrap_or("p");
+        let route = match caps.get(1).map(|m| m.as_str()) {
+            Some("reels") => "reel",
+            Some(route) => route,
+            None => "p",
+        };
 
         // Capture group 2 = instagram.com shortcode, group 3 = instagr.am shortcode
         let shortcode = caps
@@ -91,17 +124,23 @@ fn extract_links(text: &str) -> Vec<InstagramLink> {
     results
 }
 
-async fn first_working_url(client: &reqwest::Client, urls: &[String]) -> Option<String> {
+async fn first_working_url(client: &reqwest::Client, urls: &[String]) -> Result<String, String> {
+    let mut reasons = Vec::new();
+
     for url in urls {
         if is_unconditional_fallback(url) {
             tracing::warn!(
                 "No Instagram embed provider passed preflight, falling back to {}",
                 url
             );
-            return Some(url.clone());
+            return Ok(url.clone());
         }
-        if has_embed_metadata(client, url).await {
-            return Some(url.clone());
+        match has_embed_metadata(client, url).await {
+            Ok(()) => return Ok(url.clone()),
+            Err(reason) => {
+                tracing::warn!("Instagram provider {} failed preflight: {}", url, reason);
+                reasons.push(format!("{url}: {reason}"));
+            }
         }
     }
 
@@ -109,7 +148,7 @@ async fn first_working_url(client: &reqwest::Client, urls: &[String]) -> Option<
         "No Instagram embed provider passed preflight for {:?}",
         urls
     );
-    None
+    Err(reasons.join("; "))
 }
 
 fn is_unconditional_fallback(url: &str) -> bool {
@@ -117,18 +156,18 @@ fn is_unconditional_fallback(url: &str) -> bool {
         .is_some_and(|rest| rest.starts_with('/'))
 }
 
-async fn has_embed_metadata(client: &reqwest::Client, url: &str) -> bool {
-    let Ok(resp) = client
+async fn has_embed_metadata(client: &reqwest::Client, url: &str) -> Result<(), String> {
+    let resp = client
         .get(url)
         .header("User-Agent", DISCORDBOT_USER_AGENT)
         .send()
         .await
-    else {
-        return false;
-    };
+        .map_err(|e| format!("request failed: {e}"))?;
 
-    if !resp.status().is_success() {
-        return false;
+    let status = resp.status();
+    let final_url = resp.url().to_string();
+    if !status.is_success() {
+        return Err(format!("HTTP {status} (final URL {final_url})"));
     }
 
     // Some providers redirect the crawler straight to the CDN media file,
@@ -139,17 +178,23 @@ async fn has_embed_metadata(client: &reqwest::Client, url: &str) -> bool {
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
     if is_media_content_type(content_type) {
-        return true;
+        return Ok(());
     }
 
-    let Ok(body) = resp.text().await else {
-        return false;
-    };
+    let body = resp
+        .text()
+        .await
+        .map_err(|e| format!("body read failed: {e}"))?;
 
-    body.contains("og:image")
+    if body.contains("og:image")
         || body.contains("og:video")
         || body.contains("twitter:image")
         || body.contains("twitter:player")
+    {
+        Ok(())
+    } else {
+        Err(format!("no embed metadata (final URL {final_url})"))
+    }
 }
 
 fn is_media_content_type(content_type: &str) -> bool {
@@ -176,6 +221,23 @@ mod tests {
         assert_eq!(
             links[0].candidates[0],
             "https://eeinstagram.com/reel/ABC_123-"
+        );
+    }
+
+    #[test]
+    fn handles_username_and_reels_paths() {
+        let links = extract_links(
+            "https://www.instagram.com/some.user/reel/ABC123/?igsh=xyz https://instagram.com/reels/DEF456",
+        );
+
+        assert_eq!(links.len(), 2);
+        assert_eq!(
+            links[0].candidates[0],
+            "https://eeinstagram.com/reel/ABC123"
+        );
+        assert_eq!(
+            links[1].candidates[0],
+            "https://eeinstagram.com/reel/DEF456"
         );
     }
 
@@ -231,7 +293,7 @@ mod tests {
         ];
 
         assert_eq!(
-            first_working_url(&client, &urls).await.as_deref(),
+            first_working_url(&client, &urls).await.ok().as_deref(),
             Some("https://kkinstagram.com/p/XYZ987")
         );
     }

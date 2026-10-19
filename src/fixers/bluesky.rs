@@ -5,9 +5,18 @@ use regex::Regex;
 static API_BASE: &str = "https://api.fxbsky.app";
 static FIX_BASE: &str = "https://fxbsky.app";
 
+fn link_regex() -> Regex {
+    Regex::new(r#"https?://(?:www\.)?bsky\.app/profile/([\w.\-]+)/post/([\w]+)"#).unwrap()
+}
+
+/// Cheap check (no network): does `text` contain a Bluesky link?
+pub fn detect(text: &str) -> bool {
+    link_regex().is_match(text)
+}
+
 /// Extract Bluesky links and rewrite them with smart translation.
 pub async fn fix(text: &str) -> Vec<FixedLink> {
-    let re = Regex::new(r#"https?://(?:www\.)?bsky\.app/profile/([\w.\-]+)/post/([\w]+)"#).unwrap();
+    let re = link_regex();
 
     let mut results = Vec::new();
 

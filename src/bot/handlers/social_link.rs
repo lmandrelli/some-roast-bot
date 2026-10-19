@@ -19,19 +19,56 @@ impl MessageHandler for SocialLinkHandler {
     }
 
     async fn can_handle(&self, ctx: &HandlerContext<'_>) -> bool {
-        // Cheap check: are there any fixable links in the message?
-        !fixers::fix_links(&ctx.message.content).await.is_empty()
+        // Cheap check (regex only): are there any fixable links in the message?
+        // The network preflight runs once, in `handle`.
+        fixers::has_fixable_link(&ctx.message.content)
     }
 
     async fn handle(&self, ctx: &HandlerContext<'_>) -> Result<Option<String>, BotError> {
         let msg = ctx.message;
-        let fixed = fixers::fix_links(&msg.content).await;
-        if fixed.is_empty() {
-            return Ok(None);
+        let outcome = fixers::fix_links(&msg.content).await;
+
+        for link in &outcome.fixed {
+            tracing::info!(
+                "Fixed {} link {} -> {}",
+                link.platform,
+                link.original_url,
+                link.fixed_url
+            );
+        }
+        for link in &outcome.failed {
+            tracing::warn!(
+                "Could not fix {} link {}: {}",
+                link.platform,
+                link.original_url,
+                link.reason
+            );
         }
 
-        // Delete the user's original message
-        if let Err(e) = msg.delete(&ctx.serenity_ctx.http).await {
+        let failure = (!outcome.failed.is_empty()).then(|| {
+            let summary = outcome
+                .failed
+                .iter()
+                .map(|l| format!("{} {}: {}", l.platform, l.original_url, l.reason))
+                .collect::<Vec<_>>()
+                .join(" | ");
+            BotError::LinkFix(summary)
+        });
+
+        let fixed = outcome.fixed;
+        if fixed.is_empty() {
+            // Nothing to repost: keep the original message and report the failure.
+            return match failure {
+                Some(e) => Err(e),
+                None => Ok(None),
+            };
+        }
+
+        // Delete the user's original message, unless some links could not be
+        // fixed: the original is then the only place those links remain.
+        if failure.is_none()
+            && let Err(e) = msg.delete(&ctx.serenity_ctx.http).await
+        {
             tracing::warn!("Failed to delete original msg {}: {}", msg.id, e);
         }
 
@@ -56,6 +93,10 @@ impl MessageHandler for SocialLinkHandler {
         ctx.memory
             .record_roast(&msg.author.id.to_string(), None, "social_link")
             .map_err(|e| BotError::Db(e))?;
+
+        if let Some(e) = failure {
+            return Err(e);
+        }
 
         Ok(Some(String::new())) // empty = already sent our own messages
     }

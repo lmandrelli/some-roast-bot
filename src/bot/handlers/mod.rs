@@ -102,7 +102,7 @@ pub async fn event_handler(
             }
             Err(e) => {
                 tracing::error!("Roast failed: {:?}", e);
-                let error_response = crate::error::discord_error_response(&e);
+                let error_response = crate::error::bot_error_response(&e);
                 new_message.reply(&ctx.http, &error_response).await?;
             }
         }

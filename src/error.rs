@@ -17,6 +17,9 @@ pub enum BotError {
     #[error("No handler matched for this message")]
     NoHandler,
 
+    #[error("Link fix failed: {0}")]
+    LinkFix(String),
+
     #[error("Unknown error: {0}")]
     Other(String),
 }
@@ -347,6 +350,27 @@ mod tests {
     fn status_401_with_brackets_matches() {
         let s = "error: [401] unauthorized";
         assert!(contains_http_status(s, 401));
+    }
+}
+
+/// GIF shown when no embed provider could fix a social link.
+const LINK_FIX_GIF: &str = "https://klipy.com/gifs/dead-server-loki";
+
+/// Build the Discord-formatted error response for any [`BotError`].
+///
+/// Only LLM errors go through the OpenRouter classifier: a Discord 403
+/// (missing permissions) must not be reported as a moderation block.
+pub fn bot_error_response(error: &BotError) -> String {
+    match error {
+        BotError::Llm(_) => discord_error_response(error),
+        BotError::LinkFix(_) => format!(
+            "Impossible de réparer l'embed : tous les fournisseurs sont à terre. Le lien d'origine reste là, faudra cliquer comme au Moyen Âge.\n{}",
+            LINK_FIX_GIF
+        ),
+        _ => {
+            let other = LlmErrorType::Other;
+            format!("{}\n{}", other.message(), other.gif_url())
+        }
     }
 }
 
