@@ -72,9 +72,41 @@ pub fn should_translate(lang: Option<&str>) -> bool {
 pub fn contains_fixed_link(text: &str) -> bool {
     text.contains("fxtwitter.com")
         || text.contains("fxbsky.app")
-        || text.contains("vxinstagram.com")
-        || text.contains("instagram7.com")
-        || text.contains("kkinstagram.com")
+        || instagram::FIX_BASES
+            .iter()
+            .chain(LEGACY_INSTAGRAM_BASES)
+            .any(|base| text.contains(base))
         || text.contains("rxddit.com")
         || text.contains("tnktok.com")
+}
+
+/// Instagram providers the bot used to post, so replies to older reposts are
+/// still recognised.
+const LEGACY_INSTAGRAM_BASES: &[&str] = &["https://vxinstagram.com", "https://www.instagram7.com"];
+
+#[cfg(test)]
+mod tests {
+    use super::contains_fixed_link;
+
+    #[test]
+    fn recognises_current_and_legacy_instagram_providers() {
+        for url in [
+            "https://eeinstagram.com/reel/ABC",
+            "https://uuinstagram.com/p/ABC",
+            "https://fxinstagram.com/p/ABC",
+            "https://zzinstagram.com/p/ABC",
+            "https://instagramfix.com/p/ABC",
+            "https://kkinstagram.com/reel/ABC",
+            "https://vxinstagram.com/p/ABC",
+            "https://www.instagram7.com/p/ABC",
+        ] {
+            assert!(contains_fixed_link(url), "{url}");
+        }
+    }
+
+    #[test]
+    fn ignores_original_instagram_links() {
+        assert!(!contains_fixed_link("https://www.instagram.com/p/ABC"));
+        assert!(!contains_fixed_link("https://instagram.com/reel/ABC"));
+    }
 }

@@ -2,11 +2,25 @@ use super::{FixedLink, Platform};
 use regex::Regex;
 use std::time::Duration;
 
-static FIX_BASES: &[&str] = &[
-    "https://vxinstagram.com",
-    "https://www.instagram7.com",
-    "https://kkinstagram.com",
+/// Providers tried in order; each must pass the embed preflight to be used.
+/// Validated 2026-10-19 with the Discordbot UA on real posts/reels: all return
+/// og:video/og:image for real shortcodes and nothing for unknown ones.
+pub(crate) static FIX_BASES: &[&str] = &[
+    "https://eeinstagram.com",
+    "https://uuinstagram.com",
+    "https://fxinstagram.com",
+    "https://zzinstagram.com",
+    "https://instagramfix.com",
+    UNCONDITIONAL_FALLBACK_BASE,
 ];
+
+/// Last-resort provider, posted without preflight when every other provider
+/// failed. kkinstagram redirects Discordbot straight to the media file.
+const UNCONDITIONAL_FALLBACK_BASE: &str = "https://kkinstagram.com";
+
+/// Discord renders what its crawler sees, so the preflight impersonates it.
+const DISCORDBOT_USER_AGENT: &str =
+    "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)";
 
 /// Extract Instagram links and rewrite them to the first provider that looks embeddable.
 pub async fn fix(text: &str) -> Vec<FixedLink> {
@@ -79,6 +93,13 @@ fn extract_links(text: &str) -> Vec<InstagramLink> {
 
 async fn first_working_url(client: &reqwest::Client, urls: &[String]) -> Option<String> {
     for url in urls {
+        if is_unconditional_fallback(url) {
+            tracing::warn!(
+                "No Instagram embed provider passed preflight, falling back to {}",
+                url
+            );
+            return Some(url.clone());
+        }
         if has_embed_metadata(client, url).await {
             return Some(url.clone());
         }
@@ -91,10 +112,15 @@ async fn first_working_url(client: &reqwest::Client, urls: &[String]) -> Option<
     None
 }
 
+fn is_unconditional_fallback(url: &str) -> bool {
+    url.strip_prefix(UNCONDITIONAL_FALLBACK_BASE)
+        .is_some_and(|rest| rest.starts_with('/'))
+}
+
 async fn has_embed_metadata(client: &reqwest::Client, url: &str) -> bool {
     let Ok(resp) = client
         .get(url)
-        .header("User-Agent", "some-roast-bot/0.5.0")
+        .header("User-Agent", DISCORDBOT_USER_AGENT)
         .send()
         .await
     else {
@@ -103,6 +129,17 @@ async fn has_embed_metadata(client: &reqwest::Client, url: &str) -> bool {
 
     if !resp.status().is_success() {
         return false;
+    }
+
+    // Some providers redirect the crawler straight to the CDN media file,
+    // which Discord embeds directly. Don't download it.
+    let content_type = resp
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    if is_media_content_type(content_type) {
+        return true;
     }
 
     let Ok(body) = resp.text().await else {
@@ -115,26 +152,30 @@ async fn has_embed_metadata(client: &reqwest::Client, url: &str) -> bool {
         || body.contains("twitter:player")
 }
 
+fn is_media_content_type(content_type: &str) -> bool {
+    content_type.starts_with("video/") || content_type.starts_with("image/")
+}
+
 #[cfg(test)]
 mod tests {
-    use super::extract_links;
+    use super::{
+        FIX_BASES, extract_links, first_working_url, is_media_content_type,
+        is_unconditional_fallback,
+    };
 
     #[test]
     fn preserves_reel_route_for_all_providers() {
         let links = extract_links("https://www.instagram.com/reel/ABC_123-");
 
         assert_eq!(links.len(), 1);
+        let expected: Vec<String> = FIX_BASES
+            .iter()
+            .map(|base| format!("{}/reel/ABC_123-", base))
+            .collect();
+        assert_eq!(links[0].candidates, expected);
         assert_eq!(
             links[0].candidates[0],
-            "https://vxinstagram.com/reel/ABC_123-"
-        );
-        assert_eq!(
-            links[0].candidates[1],
-            "https://www.instagram7.com/reel/ABC_123-"
-        );
-        assert_eq!(
-            links[0].candidates[2],
-            "https://kkinstagram.com/reel/ABC_123-"
+            "https://eeinstagram.com/reel/ABC_123-"
         );
     }
 
@@ -143,6 +184,55 @@ mod tests {
         let links = extract_links("https://instagr.am/p/XYZ987");
 
         assert_eq!(links.len(), 1);
-        assert_eq!(links[0].candidates[0], "https://vxinstagram.com/p/XYZ987");
+        assert_eq!(links[0].candidates[0], "https://eeinstagram.com/p/XYZ987");
+    }
+
+    #[test]
+    fn kkinstagram_is_the_last_provider() {
+        assert_eq!(FIX_BASES.last(), Some(&"https://kkinstagram.com"));
+        assert!(
+            FIX_BASES[..FIX_BASES.len() - 1]
+                .iter()
+                .all(|base| !is_unconditional_fallback(&format!("{}/p/X", base)))
+        );
+    }
+
+    #[test]
+    fn recognises_unconditional_fallback_urls() {
+        assert!(is_unconditional_fallback(
+            "https://kkinstagram.com/p/XYZ987"
+        ));
+        assert!(!is_unconditional_fallback(
+            "https://kkinstagram.com.evil/p/X"
+        ));
+        assert!(!is_unconditional_fallback(
+            "https://eeinstagram.com/p/XYZ987"
+        ));
+    }
+
+    #[test]
+    fn accepts_direct_media_responses() {
+        assert!(is_media_content_type("video/mp4"));
+        assert!(is_media_content_type("image/jpeg"));
+        assert!(!is_media_content_type("text/html; charset=utf-8"));
+        assert!(!is_media_content_type("application/json"));
+    }
+
+    #[tokio::test]
+    async fn falls_back_to_kkinstagram_without_preflight() {
+        // Unroutable providers fail fast; kkinstagram must be returned anyway.
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_millis(200))
+            .build()
+            .unwrap();
+        let urls = vec![
+            "http://127.0.0.1:9/p/XYZ987".to_string(),
+            "https://kkinstagram.com/p/XYZ987".to_string(),
+        ];
+
+        assert_eq!(
+            first_working_url(&client, &urls).await.as_deref(),
+            Some("https://kkinstagram.com/p/XYZ987")
+        );
     }
 }
