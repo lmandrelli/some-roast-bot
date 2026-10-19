@@ -18,6 +18,7 @@ jobs:
       packages: write
     outputs:
       version: ${{ steps.version.outputs.version }}
+      digest: ${{ steps.push.outputs.digest }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -45,6 +46,7 @@ jobs:
             type=raw,value=latest
 
       - name: Build and push Docker image
+        id: push
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -62,3 +64,112 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Pushed version: $VERSION"
+
+  update-galaxie-infra:
+    name: Open galaxie-infra PR
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    concurrency:
+      group: galaxie-infra-some-roast
+      cancel-in-progress: false
+    env:
+      IMAGE: ghcr.io/lmandrelli/some-roast-bot
+      VERSION: ${{ needs.build.outputs.version }}
+      BUILT_DIGEST: ${{ needs.build.outputs.digest }}
+      INFRA_REPO: lmandrelli/galaxie-infra
+      MANIFEST: kubernetes/apps/some-roast/some-roast.yaml
+      GH_TOKEN: ${{ secrets.GALAXIE_INFRA_TOKEN }}
+    steps:
+      - name: Check GALAXIE_INFRA_TOKEN
+        id: token
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning title=galaxie-infra not updated::The GALAXIE_INFRA_TOKEN secret is not set, so no PR was opened in $INFRA_REPO. Renovate will pick the new digest up later."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Log in to GitHub Container Registry
+        if: steps.token.outputs.present == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve the digest served for latest
+        if: steps.token.outputs.present == 'true'
+        id: digest
+        run: |
+          # Renovate compares the digest the registry serves for the tag
+          # (the index when multi-arch), so pin exactly that one.
+          for attempt in 1 2 3 4 5; do
+            DIGEST=$(docker buildx imagetools inspect "$IMAGE:latest" --format '{{json .Manifest}}' | jq -r .digest) || DIGEST=""
+            if [ "$DIGEST" = "$BUILT_DIGEST" ]; then
+              break
+            fi
+            echo "Attempt $attempt: registry serves '$DIGEST', built '$BUILT_DIGEST'"
+            sleep 10
+          done
+          if [ "$DIGEST" != "$BUILT_DIGEST" ]; then
+            echo "::error::$IMAGE:latest resolves to '$DIGEST', not the image just built ($BUILT_DIGEST)"
+            exit 1
+          fi
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+          echo "$IMAGE:latest -> $DIGEST"
+
+      - name: Update the image digest
+        if: steps.token.outputs.present == 'true'
+        id: update
+        env:
+          DIGEST: ${{ steps.digest.outputs.digest }}
+        run: |
+          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${INFRA_REPO}.git" infra
+          cd infra
+          COUNT=$(grep -cE "^[[:space:]]*image: ${IMAGE}:[^@[:space:]]+@sha256:[0-9a-f]{64}[[:space:]]*$" "$MANIFEST" || true)
+          if [ "$COUNT" != "1" ]; then
+            echo "::error::Expected exactly one pinned '$IMAGE' image line in $MANIFEST, found $COUNT"
+            exit 1
+          fi
+          sed -i -E "s#^([[:space:]]*image: ${IMAGE}:[^@[:space:]]+)@sha256:[0-9a-f]{64}#\1@${DIGEST}#" "$MANIFEST"
+          if git diff --quiet; then
+            echo "$MANIFEST already pins $DIGEST, nothing to do"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git diff
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open the galaxie-infra PR
+        if: steps.update.outputs.changed == 'true'
+        working-directory: infra
+        env:
+          DIGEST: ${{ steps.digest.outputs.digest }}
+        run: |
+          BRANCH="some-roast/$VERSION"
+          TITLE="chore(some-roast): image $VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git commit -am "$TITLE" -m "Empreinte de $IMAGE:latest pour la v$VERSION : $DIGEST."
+          git push --force origin "$BRANCH"
+
+          PR=$(gh pr list --repo "$INFRA_REPO" --head "$BRANCH" --state open --json url --jq '.[0].url // empty')
+          if [ -z "$PR" ]; then
+            RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            PR=$(gh pr create --repo "$INFRA_REPO" --base main --head "$BRANCH" --title "$TITLE" \
+              --body "Mise à jour de Some(roast) vers la v$VERSION, ouverte par le workflow Build and Push de $GITHUB_REPOSITORY ($RUN_URL). Empreinte de latest : $DIGEST.")
+          fi
+          echo "PR: $PR"
+          gh pr merge "$PR" --repo "$INFRA_REPO" --auto --squash
+
+          # Close older Some(roast) PRs that this one supersedes.
+          gh pr list --repo "$INFRA_REPO" --state open --json number,headRefName \
+            --jq ".[] | select(.headRefName | startswith(\"some-roast/\")) | select(.headRefName != \"$BRANCH\") | .number" |
+          while read -r OLD; do
+            gh pr close "$OLD" --repo "$INFRA_REPO" --delete-branch --comment "Remplacée par $PR."
+          done

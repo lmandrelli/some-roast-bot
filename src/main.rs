@@ -59,7 +59,7 @@ async fn main() -> Result<(), BotError> {
                 tracing::info!("Commands registered successfully");
 
                 let activity_name = if config.is_prod {
-                    "don't try to talk about Microsoft".to_string()
+                    "don't try to talk about Microslop".to_string()
                 } else {
                     format!("running v{}", env!("CARGO_PKG_VERSION"))
                 };
