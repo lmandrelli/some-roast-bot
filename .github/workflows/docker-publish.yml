@@ -1,4 +1,4 @@
-name: Build, Push and Deploy
+name: Build and Push
 
 on:
   push:
@@ -62,37 +62,3 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Pushed version: $VERSION"
-
-  deploy:
-    name: Deploy to Coolify
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Connect to Tailscale
-        uses: tailscale/github-action@v4
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: ${{ secrets.TAILSCALE_TAG }}
-
-      - name: Trigger Coolify deploy
-        run: |
-          WEBHOOK="${{ secrets.COOLIFY_WEBHOOK }}"
-          TOKEN="${{ secrets.COOLIFY_TOKEN }}"
-
-          # Append force=true to the webhook URL to request a fresh pull.
-          # Note: Coolify has a known bug where force=true restarts the
-          # container without re-pulling the image when using :latest.
-          # See: https://github.com/coollabsio/coolify/issues/5318
-          #
-          # Once Coolify fixes this bug, the workflow will automatically
-          # start pulling the latest image on every deploy.
-          if [[ "$WEBHOOK" == *"?"* ]]; then
-            WEBHOOK="${WEBHOOK}&force=true"
-          else
-            WEBHOOK="${WEBHOOK}?force=true"
-          fi
-
-          echo "Triggering Coolify deploy: $WEBHOOK"
-          curl -f -s -S --request GET "$WEBHOOK" \
-            --header "Authorization: Bearer $TOKEN"
