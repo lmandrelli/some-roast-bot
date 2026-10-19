@@ -19,6 +19,7 @@ pub fn fix(text: &str) -> Vec<FixedLink> {
             original_url: original,
             fixed_url: format!("{}/@{}/video/{}", FIX_BASE, user, video_id),
             translated: false,
+            fallback: false,
         });
     }
 

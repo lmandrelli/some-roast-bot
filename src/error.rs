@@ -356,6 +356,14 @@ mod tests {
 /// GIF shown when no embed provider could fix a social link.
 const LINK_FIX_GIF: &str = "https://klipy.com/gifs/dead-server-loki";
 
+/// Message posted next to a link that only the last-resort provider could fix.
+pub fn link_fallback_response() -> String {
+    format!(
+        "Tous les fournisseurs d'embed Instagram sont à terre. Comme au Moyen Âge, je vous mets le lien kkinstagram : s'il n'affiche rien, faudra cliquer.\n{}",
+        LINK_FIX_GIF
+    )
+}
+
 /// Build the Discord-formatted error response for any [`BotError`].
 ///
 /// Only LLM errors go through the OpenRouter classifier: a Discord 403

@@ -22,6 +22,7 @@ pub fn fix(text: &str) -> Vec<FixedLink> {
             original_url: original,
             fixed_url: format!("{}/r/{}/comments/{}", FIX_BASE, sub, post_id),
             translated: false,
+            fallback: false,
         });
     }
 
@@ -34,6 +35,7 @@ pub fn fix(text: &str) -> Vec<FixedLink> {
             original_url: original,
             fixed_url: format!("{}/comments/{}", FIX_BASE, post_id),
             translated: false,
+            fallback: false,
         });
     }
 

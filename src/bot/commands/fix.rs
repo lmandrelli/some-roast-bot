@@ -37,5 +37,10 @@ pub async fn fix(
         .join(" ");
 
     ctx.say(reply).await?;
+
+    if fixed.iter().any(|l| l.fallback) {
+        ctx.say(crate::error::link_fallback_response()).await?;
+    }
+
     Ok(())
 }

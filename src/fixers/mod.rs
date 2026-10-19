@@ -11,6 +11,9 @@ pub struct FixedLink {
     pub original_url: String,
     pub fixed_url: String,
     pub translated: bool,
+    /// The link points to a last-resort provider that skipped the preflight,
+    /// so the embed may not render.
+    pub fallback: bool,
 }
 
 /// A link we recognised but could not turn into a working embed.

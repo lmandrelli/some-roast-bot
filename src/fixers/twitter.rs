@@ -39,6 +39,7 @@ pub async fn fix(text: &str) -> Vec<FixedLink> {
             original_url: original,
             fixed_url,
             translated,
+            fallback: false,
         });
     }
 

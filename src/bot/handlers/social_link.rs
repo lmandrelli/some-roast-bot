@@ -90,6 +90,15 @@ impl MessageHandler for SocialLinkHandler {
             .await?;
         msg.channel_id.say(&ctx.serenity_ctx.http, urls).await?;
 
+        if fixed.iter().any(|l| l.fallback) {
+            msg.channel_id
+                .say(
+                    &ctx.serenity_ctx.http,
+                    crate::error::link_fallback_response(),
+                )
+                .await?;
+        }
+
         ctx.memory
             .record_roast(&msg.author.id.to_string(), None, "social_link")
             .map_err(|e| BotError::Db(e))?;

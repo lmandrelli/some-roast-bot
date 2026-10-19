@@ -64,6 +64,7 @@ pub async fn fix(text: &str) -> (Vec<FixedLink>, Vec<FailedLink>) {
             Ok(fixed_url) => fixed.push(FixedLink {
                 platform: Platform::Instagram,
                 original_url: link.original_url,
+                fallback: is_unconditional_fallback(&fixed_url),
                 fixed_url,
                 translated: false,
             }),
