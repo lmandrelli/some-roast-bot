@@ -1,8 +1,8 @@
 [package]
 name = "some-roast-bot"
-version = "0.8.0"
+version = "0.9.0"
 edition = "2024"
-authors = ["Luca Mandrelli <luca.mandrelli@icloud.com>"]
+authors = ["Luca Mandrelli"]
 
 [dependencies]
 poise = { version = "0.6.1" }

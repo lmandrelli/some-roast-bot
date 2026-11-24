@@ -30,7 +30,9 @@ impl Config {
             .unwrap_or_else(|_| "https://openrouter.ai/api/v1".to_string());
 
         let model_name = std::env::var("MODEL_NAME")
-            .unwrap_or_else(|_| "@preset/mimo-v2-5-pro-on-xiaomi".to_string());
+            .ok()
+            .filter(|name| !name.is_empty())
+            .ok_or_else(|| ConfigError::MissingVar("MODEL_NAME".into()))?;
 
         let status_message = std::env::var("STATUS_MESSAGE")
             .ok()

@@ -79,7 +79,7 @@ cp .env.example .env
 | `DISCORD_TOKEN`   | Discord bot token                                                 | *(required)*                       |
 | `OPENAI_API_KEY`  | API key of the OpenAI-compatible endpoint                        | *(required)*                       |
 | `OPENAI_BASE_URL` | Base URL of the OpenAI-compatible endpoint                       | `https://openrouter.ai/api/v1`     |
-| `MODEL_NAME`      | Model (or OpenRouter `@preset/<slug>`). Must accept images: they are sent with the transcript | `@preset/mimo-v2-5-pro-on-xiaomi` |
+| `MODEL_NAME`      | Model (or OpenRouter `@preset/<slug>`). Must accept images: they are sent with the transcript | *(required)*                       |
 | `STATUS_MESSAGE`  | Discord custom status                                             | `don't try to talk about Microslop` |
 | `MAGIC_WORD`      | Word that switches every agent to a friendly easter-egg mode     | `magic`                            |
 | `MEMORY_DB_PATH`  | SQLite memory database                                            | `data/memory.db`                   |
@@ -180,8 +180,7 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-1. GitHub Actions builds the Docker image and pushes `ghcr.io/lmandrelli/some-roast-bot` tagged `1.0.0`, `1.0` and `latest`
-2. It then opens an auto-merged PR in `lmandrelli/galaxie-infra` that pins the new digest (skipped when the `GALAXIE_INFRA_TOKEN` secret is missing)
+GitHub Actions builds the Docker image and pushes `ghcr.io/lmandrelli/some-roast-bot` tagged `1.0.0`, `1.0` and `latest`. Deployments pick up new tags on their side (e.g. Argo CD Image Updater on `X.Y.Z` tags); the CI does not touch any infrastructure repository.
 
 Run a single instance per Discord token, or every message gets answered twice. Without `DATABASE_URL`, keep `MEMORY_DB_PATH` on a persistent volume (`/data` in `docker-compose.yml`).
 
