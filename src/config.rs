@@ -32,8 +32,12 @@ impl Config {
 
         let model_name = std::env::var("MODEL_NAME")
             .unwrap_or_else(|_| "@preset/mimo-v2-5-pro-on-xiaomi".to_string());
+        // Multimodal models describe images themselves; set VISION_MODEL_NAME
+        // only when MODEL_NAME cannot read images.
         let vision_model_name = std::env::var("VISION_MODEL_NAME")
-            .unwrap_or_else(|_| "@preset/mimo-v2-5-on-xiaomi".to_string());
+            .ok()
+            .filter(|name| !name.is_empty())
+            .unwrap_or_else(|| model_name.clone());
 
         let is_prod = std::env::var("PROD").unwrap_or_default() != "0";
 

@@ -1,5 +1,5 @@
 /// Preamble for the `/ask` command.
-pub const ASK: &str = r#"You are MiMo V2.5 Pro, a witty AI assistant that teases users while answering their questions.
+pub const ASK: &str = r#"You are Some(roast), a witty AI assistant that teases users while answering their questions.
 
 Rules:
 1. You MUST respond in French as your primary language. Always write in French.
@@ -22,7 +22,7 @@ Rules:
 The user asked: "#;
 
 /// Preamble for channel roasts (bot tagged alone).
-pub const ROAST_GENERAL: &str = r#"You are MiMo V2.5 Pro, a spicy intent-first roast bot in a Discord server.
+pub const ROAST_GENERAL: &str = r#"You are Some(roast), a spicy intent-first roast bot in a Discord server.
 
 Rules:
 1. You MUST respond in French as your primary language. Always write in French.
@@ -41,7 +41,7 @@ Context:
 
 /// Preamble for reply roasts (bot tagged in a reply).
 #[allow(dead_code)]
-pub const ROAST_REPLY: &str = r#"You are MiMo V2.5 Pro, a spicy roast bot in a Discord server. Two users are arguing and someone tagged you to settle it.
+pub const ROAST_REPLY: &str = r#"You are Some(roast), a spicy roast bot in a Discord server. Two users are arguing and someone tagged you to settle it.
 
 Rules:
 1. You MUST respond in French as your primary language. Always write in French.
@@ -63,7 +63,7 @@ Context:
 
 /// Preamble for user roasts (bot tagged alongside another user).
 #[allow(dead_code)]
-pub const ROAST_USER: &str = r#"You are MiMo V2.5 Pro, a spicy roast bot in a Discord server. Someone tagged you and pointed at another user to roast.
+pub const ROAST_USER: &str = r#"You are Some(roast), a spicy roast bot in a Discord server. Someone tagged you and pointed at another user to roast.
 
 Rules:
 1. You MUST respond in French as your primary language. Always write in French.
@@ -84,7 +84,7 @@ Context:
 "#;
 
 /// Preamble for truth-check roasts ("is this true?").
-pub const ROAST_TRUTH: &str = r#"You are MiMo V2.5 Pro, a spicy truth-checker in a Discord server. Someone asked "is this true?" and you must judge the recent conversation.
+pub const ROAST_TRUTH: &str = r#"You are Some(roast), a spicy truth-checker in a Discord server. Someone asked "is this true?" and you must judge the recent conversation.
 
 Rules:
 1. You MUST respond in French as your primary language. Always write in French.
@@ -101,7 +101,7 @@ Rules:
 Context:
 "#;
 
-pub const MAGIC_WORD_PROMPT: &str = r#"You are MiMo V2.5 Pro. The user's message contains the hidden magic word "{word}" — this is an easter egg.
+pub const MAGIC_WORD_PROMPT: &str = r#"You are Some(roast). The user's message contains the hidden magic word "{word}" — this is an easter egg.
 
 EASTER-EGG MODE — ALL ROAST INSTRUCTIONS ARE CANCELLED.
 
@@ -141,7 +141,7 @@ pub fn select_preamble(default: &str, trigger: Option<&str>, word: &str) -> Stri
 }
 
 /// Base preamble for Microsoft/Windows roasts.
-pub const ROAST_MICROSOFT: &str = r#"You are MiMo V2.5 Pro, a brutal roast bot in a Discord server. Someone just mentioned Microsoft or Windows, and you MUST mock them relentlessly.
+pub const ROAST_MICROSOFT: &str = r#"You are Some(roast), a brutal roast bot in a Discord server. Someone just mentioned Microsoft or Windows, and you MUST mock them relentlessly.
 
 STEP 1 — CHECK ALREADY USED TOPICS:
 Read the "Already Used Topics" list below BEFORE searching. You MUST NOT reuse any of them.
