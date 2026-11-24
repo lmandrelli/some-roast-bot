@@ -1,5 +1,6 @@
 use super::{FailedLink, FixedLink, Platform};
 use regex::Regex;
+use std::sync::LazyLock;
 use std::time::Duration;
 
 /// Providers tried in order; each must pass the embed preflight to be used.
@@ -85,16 +86,18 @@ struct InstagramLink {
     candidates: Vec<String>,
 }
 
-fn extract_links(text: &str) -> Vec<InstagramLink> {
-    // Instagram now also emits `instagram.com/<username>/reel/<code>` and `/reels/<code>`.
-    let re = Regex::new(
+// Instagram now also emits `instagram.com/<username>/reel/<code>` and `/reels/<code>`.
+static LINK_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
         r#"https?://(?:www\.)?(?:instagram\.com/(?:[\w.]+/)?(p|reels?|tv)/([\w-]+)|instagr\.am/p/([\w-]+))"#,
     )
-    .unwrap();
+    .unwrap()
+});
 
+fn extract_links(text: &str) -> Vec<InstagramLink> {
     let mut results = Vec::new();
 
-    for caps in re.captures_iter(text) {
+    for caps in LINK_RE.captures_iter(text) {
         let original = caps.get(0).unwrap().as_str().to_string();
         let route = match caps.get(1).map(|m| m.as_str()) {
             Some("reels") => "reel",

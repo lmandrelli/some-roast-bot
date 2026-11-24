@@ -113,14 +113,12 @@ pub async fn fetch_channel_context(
         if !raw.iter().any(|m| m.id == replied.id) {
             raw.push(replied.clone());
         }
-    } else if let Some(reference) = &trigger.message_reference {
-        if let Some(id) = reference.message_id {
-            if !raw.iter().any(|m| m.id == id) {
-                if let Ok(message) = channel_id.message(&ctx.http, id).await {
-                    raw.push(message);
-                }
-            }
-        }
+    } else if let Some(reference) = &trigger.message_reference
+        && let Some(id) = reference.message_id
+        && !raw.iter().any(|m| m.id == id)
+        && let Ok(message) = channel_id.message(&ctx.http, id).await
+    {
+        raw.push(message);
     }
     raw.sort_by_key(|m| (m.timestamp.unix_timestamp(), m.id.get()));
     raw.dedup_by_key(|m| m.id);
@@ -146,14 +144,14 @@ pub async fn fetch_channel_context(
                     .and_then(|g| g.members.get(&user.id).and_then(|m| m.nick.clone()))
             });
         }
-        if name.is_none() {
-            if let Some(gid) = guild_id {
-                name = gid
-                    .member(&ctx.http, user.id)
-                    .await
-                    .ok()
-                    .and_then(|m| m.nick);
-            }
+        if name.is_none()
+            && let Some(gid) = guild_id
+        {
+            name = gid
+                .member(&ctx.http, user.id)
+                .await
+                .ok()
+                .and_then(|m| m.nick);
         }
         identities.insert(
             user.id,
@@ -225,13 +223,13 @@ pub async fn fetch_channel_context(
             }
         }
         for s in &stickers {
-            if !s.format.to_lowercase().contains("lottie") {
-                if let Some(url) = &s.url {
-                    visuals.push(Visual {
-                        url: url.clone(),
-                        mime: None,
-                    });
-                }
+            if !s.format.to_lowercase().contains("lottie")
+                && let Some(url) = &s.url
+            {
+                visuals.push(Visual {
+                    url: url.clone(),
+                    mime: None,
+                });
             }
         }
         for e in &embeds {

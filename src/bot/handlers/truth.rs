@@ -44,8 +44,7 @@ impl MessageHandler for TruthHandler {
 
         ctx.memory
             .record_roast(&msg.author.id.to_string(), None, "truth")
-            .await
-            .map_err(|e| BotError::Db(e))?;
+            .await?;
 
         Ok(Some(output.response))
     }

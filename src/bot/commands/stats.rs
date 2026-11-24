@@ -50,7 +50,7 @@ async fn format_stats(memory: &dyn MemoryRepository) -> (String, String) {
                         }
                         content.push_str(&format!("<@{user_id}> ({cnt})"));
                     }
-                    content.push_str("\n");
+                    content.push('\n');
                 }
             }
 
@@ -66,7 +66,7 @@ async fn format_stats(memory: &dyn MemoryRepository) -> (String, String) {
                     }
                     content.push_str(&format!("<@{user_id}> ({cnt})"));
                 }
-                content.push_str("\n");
+                content.push('\n');
             }
         } else {
             content.push_str("**0**\n");

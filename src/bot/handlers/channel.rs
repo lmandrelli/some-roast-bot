@@ -46,8 +46,7 @@ impl MessageHandler for ChannelHandler {
 
         ctx.memory
             .record_roast(&triggerer_id, None, "general")
-            .await
-            .map_err(|e| BotError::Db(e))?;
+            .await?;
 
         Ok(Some(output.response))
     }

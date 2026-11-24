@@ -8,7 +8,7 @@ pub mod models;
 
 use std::sync::Arc;
 
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use poise::serenity_prelude as serenity;
 
 use agents::llm::LlmService;

@@ -2,8 +2,9 @@ use std::error::Error as StdError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum BotError {
+    // Boxed: serenity::Error is large and every handler returns BotError.
     #[error("Discord API error: {0}")]
-    Discord(#[from] serenity::Error),
+    Discord(Box<serenity::Error>),
 
     #[error("Database error: {0}")]
     Db(#[from] DbError),
@@ -22,6 +23,12 @@ pub enum BotError {
 
     #[error("Unknown error: {0}")]
     Other(String),
+}
+
+impl From<serenity::Error> for BotError {
+    fn from(e: serenity::Error) -> Self {
+        BotError::Discord(Box::new(e))
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -234,13 +241,48 @@ fn contains_http_status(s: &str, code: u16) -> bool {
     false
 }
 
+/// GIF shown when no embed provider could fix a social link.
+const LINK_FIX_GIF: &str = "https://klipy.com/gifs/dead-server-loki";
+
+/// Message posted next to a link that only the last-resort provider could fix.
+pub fn link_fallback_response() -> String {
+    format!(
+        "Tous les fournisseurs d'embed Instagram sont à terre. Comme au Moyen Âge, je vous mets le lien kkinstagram : s'il n'affiche rien, faudra cliquer.\n{}",
+        LINK_FIX_GIF
+    )
+}
+
+/// Build the Discord-formatted error response for any [`BotError`].
+///
+/// Only LLM errors go through the OpenRouter classifier: a Discord 403
+/// (missing permissions) must not be reported as a moderation block.
+pub fn bot_error_response(error: &BotError) -> String {
+    match error {
+        BotError::Llm(_) => discord_error_response(error),
+        BotError::LinkFix(_) => format!(
+            "Impossible de réparer l'embed : tous les fournisseurs sont à terre. Le lien d'origine reste là, faudra cliquer comme au Moyen Âge.\n{}",
+            LINK_FIX_GIF
+        ),
+        _ => {
+            let other = LlmErrorType::Other;
+            format!("{}\n{}", other.message(), other.gif_url())
+        }
+    }
+}
+
+/// Build a Discord-formatted error response with the GIF and message.
+pub fn discord_error_response(error: &dyn StdError) -> String {
+    let classified = classify_llm_error(error);
+    format!("{}\n{}", classified.message(), classified.gif_url())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::io;
 
     fn make_err(msg: &str) -> io::Error {
-        io::Error::new(io::ErrorKind::Other, msg)
+        io::Error::other(msg)
     }
 
     #[test]
@@ -351,39 +393,4 @@ mod tests {
         let s = "error: [401] unauthorized";
         assert!(contains_http_status(s, 401));
     }
-}
-
-/// GIF shown when no embed provider could fix a social link.
-const LINK_FIX_GIF: &str = "https://klipy.com/gifs/dead-server-loki";
-
-/// Message posted next to a link that only the last-resort provider could fix.
-pub fn link_fallback_response() -> String {
-    format!(
-        "Tous les fournisseurs d'embed Instagram sont à terre. Comme au Moyen Âge, je vous mets le lien kkinstagram : s'il n'affiche rien, faudra cliquer.\n{}",
-        LINK_FIX_GIF
-    )
-}
-
-/// Build the Discord-formatted error response for any [`BotError`].
-///
-/// Only LLM errors go through the OpenRouter classifier: a Discord 403
-/// (missing permissions) must not be reported as a moderation block.
-pub fn bot_error_response(error: &BotError) -> String {
-    match error {
-        BotError::Llm(_) => discord_error_response(error),
-        BotError::LinkFix(_) => format!(
-            "Impossible de réparer l'embed : tous les fournisseurs sont à terre. Le lien d'origine reste là, faudra cliquer comme au Moyen Âge.\n{}",
-            LINK_FIX_GIF
-        ),
-        _ => {
-            let other = LlmErrorType::Other;
-            format!("{}\n{}", other.message(), other.gif_url())
-        }
-    }
-}
-
-/// Build a Discord-formatted error response with the GIF and message.
-pub fn discord_error_response(error: &dyn StdError) -> String {
-    let classified = classify_llm_error(error);
-    format!("{}\n{}", classified.message(), classified.gif_url())
 }

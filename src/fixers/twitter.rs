@@ -1,26 +1,25 @@
 use super::{FixedLink, Platform, should_translate};
 use crate::models::fxtwitter::FxEmbedResponse;
 use regex::Regex;
+use std::sync::LazyLock;
 
 static API_BASE: &str = "https://api.fxtwitter.com";
 static FIX_BASE: &str = "https://fxtwitter.com";
 
-fn link_regex() -> Regex {
+static LINK_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"https?://(?:www\.)?(?:twitter\.com|x\.com)/([\w_]+)/status/(\d+)"#).unwrap()
-}
+});
 
 /// Cheap check (no network): does `text` contain a Twitter/X link?
 pub fn detect(text: &str) -> bool {
-    link_regex().is_match(text)
+    LINK_RE.is_match(text)
 }
 
 /// Extract Twitter/X links and rewrite them with smart translation.
 pub async fn fix(text: &str) -> Vec<FixedLink> {
-    let re = link_regex();
-
     let mut results = Vec::new();
 
-    for caps in re.captures_iter(text) {
+    for caps in LINK_RE.captures_iter(text) {
         let original = caps.get(0).unwrap().as_str().to_string();
         let user = &caps[1];
         let tweet_id = &caps[2];
