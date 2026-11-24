@@ -5,7 +5,7 @@ use poise::serenity_prelude as serenity;
 
 #[poise::command(slash_command, prefix_command)]
 pub async fn stats(ctx: poise::Context<'_, Data, Error>) -> Result<(), Error> {
-    let (title, content) = format_stats(ctx.data().memory.as_ref());
+    let (title, content) = format_stats(ctx.data().memory.as_ref()).await;
 
     let embed = serenity::CreateEmbed::new()
         .title(&title)
@@ -17,7 +17,7 @@ pub async fn stats(ctx: poise::Context<'_, Data, Error>) -> Result<(), Error> {
     Ok(())
 }
 
-fn format_stats(memory: &dyn MemoryRepository) -> (String, String) {
+async fn format_stats(memory: &dyn MemoryRepository) -> (String, String) {
     let roast_types = [
         ("channel", "Roast par mention de Some(roast)"),
         ("user", "Roast par mention d'un utilisateur"),
@@ -31,14 +31,17 @@ fn format_stats(memory: &dyn MemoryRepository) -> (String, String) {
     let mut content = String::new();
 
     for (roast_type, title) in roast_types.iter() {
-        let count = memory.get_roast_count(roast_type).unwrap_or(0);
+        let count = memory.get_roast_count(roast_type).await.unwrap_or(0);
         content.push_str(&format!("### {title}\n"));
 
         if count > 0 {
             content.push_str(&format!("**{}**\n", count));
 
             if *roast_type != "microsoft" {
-                let triggerers = memory.get_top_triggerers(roast_type, 3).unwrap_or_default();
+                let triggerers = memory
+                    .get_top_triggerers(roast_type, 3)
+                    .await
+                    .unwrap_or_default();
                 if !triggerers.is_empty() {
                     content.push_str("**Top déclencheurs**\n");
                     for (i, (user_id, cnt)) in triggerers.iter().enumerate() {
@@ -51,7 +54,10 @@ fn format_stats(memory: &dyn MemoryRepository) -> (String, String) {
                 }
             }
 
-            let targets = memory.get_top_targets(roast_type, 3).unwrap_or_default();
+            let targets = memory
+                .get_top_targets(roast_type, 3)
+                .await
+                .unwrap_or_default();
             if !targets.is_empty() {
                 content.push_str("**Top victimes**\n");
                 for (i, (user_id, cnt)) in targets.iter().enumerate() {

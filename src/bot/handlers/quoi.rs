@@ -49,6 +49,7 @@ impl MessageHandler for QuoiHandler {
     async fn handle(&self, ctx: &HandlerContext<'_>) -> Result<Option<String>, BotError> {
         ctx.memory
             .increment_quoi_feur_count()
+            .await
             .map_err(|e| BotError::Db(e))?;
         Ok(Some("-feur".to_string()))
     }

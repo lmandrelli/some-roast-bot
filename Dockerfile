@@ -19,8 +19,9 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/app/target,sharing=locked \
     cargo chef cook --release --recipe-path recipe.json
 
-# Stage 3: Build the application (only re-runs when src/ changes)
-COPY Cargo.toml Cargo.lock ./
+# Stage 3: Build the application (only re-runs when src/ or migrations/ change)
+COPY Cargo.toml Cargo.lock build.rs ./
+COPY migrations/ migrations/
 COPY src/ src/
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \

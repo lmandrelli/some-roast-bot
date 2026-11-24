@@ -46,10 +46,12 @@ impl MessageHandler for MicrosoftHandler {
 
         ctx.memory
             .record_roast(&msg.author.id.to_string(), None, "microsoft")
+            .await
             .map_err(|e| BotError::Db(e))?;
 
         ctx.memory
             .increment_microsoft_count()
+            .await
             .map_err(|e| BotError::Db(e))?;
 
         Ok(Some(output.response))

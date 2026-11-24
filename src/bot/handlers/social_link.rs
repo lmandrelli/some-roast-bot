@@ -101,6 +101,7 @@ impl MessageHandler for SocialLinkHandler {
 
         ctx.memory
             .record_roast(&msg.author.id.to_string(), None, "social_link")
+            .await
             .map_err(|e| BotError::Db(e))?;
 
         if let Some(e) = failure {

@@ -14,7 +14,7 @@ use poise::serenity_prelude as serenity;
 use agents::llm::LlmService;
 use bot::Data;
 use config::Config;
-use db::sqlite::SqliteMemoryRepository;
+use db::sql::SqlMemoryRepository;
 
 #[tokio::main]
 async fn main() -> Result<(), BotError> {
@@ -23,7 +23,10 @@ async fn main() -> Result<(), BotError> {
     tracing::info!("Starting some-roast-bot v{}", env!("CARGO_PKG_VERSION"));
 
     let config = Arc::new(Config::from_env()?);
-    let memory = Arc::new(SqliteMemoryRepository::new(&config.memory_db_path)?);
+    let memory = Arc::new(
+        SqlMemoryRepository::connect(config.database_url.as_deref(), &config.memory_db_path)
+            .await?,
+    );
     let llm_service = Arc::new(LlmService::new(&config));
     let pipeline = bot::handlers::build_pipeline();
 
