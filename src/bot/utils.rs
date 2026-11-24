@@ -67,7 +67,7 @@ pub async fn send_roast(
     channel_id: serenity::ChannelId,
     text: &str,
     allowed_users: &[serenity::UserId],
-) -> Result<(), serenity::Error> {
+) -> Result<(), crate::error::BotError> {
     const LIMIT: usize = 2000;
     let mut remaining = text;
     while !remaining.is_empty() {
