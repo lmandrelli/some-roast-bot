@@ -92,16 +92,16 @@ impl LlmErrorType {
                 "Oh non ! J'ai mangé tous les tokens ! Vous voulez pas me soutenir sur Tipee ?"
             }
             LlmErrorType::ServerOutOfCapacity => {
-                "Les serveurs sont saturés... Même OpenRouter a besoin d'une pause café."
+                "Les serveurs sont saturés... Même mon fournisseur d'IA a besoin d'une pause café."
             }
             LlmErrorType::BadAuthentication => {
                 "Problème d'authentification... Laisse-moi entrer, j'ai perdu mes clés !"
             }
             LlmErrorType::PaymentRequired => {
-                "Mon propriétaire a oublié de créditer le compte OpenRouter... OFFREZ-LUI UN CAFÉ !"
+                "Mon propriétaire a oublié de recharger le compte de l'API... OFFREZ-LUI UN CAFÉ !"
             }
             LlmErrorType::Moderation => {
-                "OpenRouter ou un provider a bloqué la requête (modération ou guardrail). Pas moi, c'est eux."
+                "Le fournisseur d'IA a bloqué la requête (modération ou guardrail). Pas moi, c'est eux."
             }
             LlmErrorType::EmptyResponse => {
                 "Imagine payer pour une requête API, et que tu n'ais rien à recevoir en retour. C'est ma situation. Fun."
