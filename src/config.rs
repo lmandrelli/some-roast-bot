@@ -7,7 +7,7 @@ pub struct Config {
     pub openai_base_url: String,
     pub model_name: String,
     pub vision_model_name: String,
-    pub is_prod: bool,
+    pub status_message: String,
     pub memory_db_path: PathBuf,
     pub database_url: Option<String>,
     pub magic_word: String,
@@ -39,7 +39,10 @@ impl Config {
             .filter(|name| !name.is_empty())
             .unwrap_or_else(|| model_name.clone());
 
-        let is_prod = std::env::var("PROD").unwrap_or_default() != "0";
+        let status_message = std::env::var("STATUS_MESSAGE")
+            .ok()
+            .filter(|message| !message.is_empty())
+            .unwrap_or_else(|| "don't try to talk about Microslop".to_string());
 
         let memory_db_path = std::env::var("MEMORY_DB_PATH")
             .map(PathBuf::from)
@@ -59,7 +62,7 @@ impl Config {
             openai_base_url,
             model_name,
             vision_model_name,
-            is_prod,
+            status_message,
             memory_db_path,
             database_url,
             magic_word,

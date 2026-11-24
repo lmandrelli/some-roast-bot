@@ -23,6 +23,9 @@ async fn main() -> Result<(), BotError> {
     tracing::info!("Starting some-roast-bot v{}", env!("CARGO_PKG_VERSION"));
 
     let config = Arc::new(Config::from_env()?);
+    if std::env::var_os("PROD").is_some() {
+        tracing::warn!("PROD is ignored: set STATUS_MESSAGE to change the Discord status");
+    }
     let memory = Arc::new(
         SqlMemoryRepository::connect(config.database_url.as_deref(), &config.memory_db_path)
             .await?,
@@ -61,13 +64,9 @@ async fn main() -> Result<(), BotError> {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                 tracing::info!("Commands registered successfully");
 
-                let activity_name = if config.is_prod {
-                    "don't try to talk about Microslop".to_string()
-                } else {
-                    format!("running v{}", env!("CARGO_PKG_VERSION"))
-                };
-
-                ctx.set_activity(Some(serenity::ActivityData::custom(activity_name)));
+                ctx.set_activity(Some(serenity::ActivityData::custom(
+                    config.status_message.clone(),
+                )));
 
                 Ok(Data {
                     memory,
