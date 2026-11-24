@@ -62,38 +62,6 @@ impl SqlMemoryRepository {
 
 #[async_trait]
 impl MemoryRepository for SqlMemoryRepository {
-    async fn image_description(&self, canonical_key: &str) -> Result<Option<String>, DbError> {
-        Ok(sqlx::query_scalar(
-            "SELECT description FROM image_descriptions WHERE canonical_key = $1",
-        )
-        .bind(canonical_key)
-        .fetch_optional(&self.pool)
-        .await?)
-    }
-
-    async fn remember_image_description(
-        &self,
-        canonical_key: &str,
-        source_url: &str,
-        description: &str,
-    ) -> Result<(), DbError> {
-        sqlx::query(
-            "INSERT INTO image_descriptions (canonical_key, source_url, description, created_at)
-             VALUES ($1, $2, $3, $4)
-             ON CONFLICT (canonical_key) DO UPDATE SET
-               source_url = excluded.source_url,
-               description = excluded.description,
-               created_at = excluded.created_at",
-        )
-        .bind(canonical_key)
-        .bind(source_url)
-        .bind(description)
-        .bind(Utc::now().to_rfc3339())
-        .execute(&self.pool)
-        .await?;
-        Ok(())
-    }
-
     async fn record_roast(
         &self,
         triggerer_id: &str,
@@ -225,25 +193,6 @@ mod tests {
     /// Runs every repository operation. Keys are unique per run so the same
     /// Postgres database can be reused across runs.
     async fn exercise(repository: &SqlMemoryRepository) {
-        let key = unique("key");
-        assert_eq!(repository.image_description(&key).await.unwrap(), None);
-        repository
-            .remember_image_description(&key, "https://source/one", "première")
-            .await
-            .unwrap();
-        assert_eq!(
-            repository.image_description(&key).await.unwrap().as_deref(),
-            Some("première")
-        );
-        repository
-            .remember_image_description(&key, "https://source/two", "mise à jour")
-            .await
-            .unwrap();
-        assert_eq!(
-            repository.image_description(&key).await.unwrap().as_deref(),
-            Some("mise à jour")
-        );
-
         let roast_type = unique("roast");
         assert_eq!(repository.get_roast_count(&roast_type).await.unwrap(), 0);
         for _ in 0..3 {

@@ -1,5 +1,11 @@
 use poise::serenity_prelude as serenity;
 use std::collections::HashSet;
+use std::sync::LazyLock;
+
+static USER_MENTION_RE: LazyLock<regex::Regex> =
+    LazyLock::new(|| regex::Regex::new(r"<@!?(\d+)>").unwrap());
+static ROLE_MENTION_RE: LazyLock<regex::Regex> =
+    LazyLock::new(|| regex::Regex::new(r"<@&\d+>").unwrap());
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SafeResponse {
@@ -13,12 +19,11 @@ pub async fn sanitize_mentions(
     self_id: serenity::UserId,
     content: &str,
 ) -> SafeResponse {
-    let user_re = regex::Regex::new(r"<@!?(\d+)>").unwrap();
     let mut allowed = HashSet::new();
     let mut valid = HashSet::new();
     let mut attempted = HashSet::new();
     if let Some(guild_id) = guild_id {
-        for captures in user_re.captures_iter(content) {
+        for captures in USER_MENTION_RE.captures_iter(content) {
             if let Ok(id) = captures[1].parse::<u64>() {
                 let id = serenity::UserId::new(id);
                 if !attempted.insert(id) || id == self_id {
@@ -36,7 +41,7 @@ pub async fn sanitize_mentions(
             }
         }
     }
-    let text = user_re.replace_all(content, |caps: &regex::Captures<'_>| {
+    let text = USER_MENTION_RE.replace_all(content, |caps: &regex::Captures<'_>| {
         let id = caps[1].parse::<u64>().ok().map(serenity::UserId::new);
         if let Some(id) = id.filter(|id| valid.contains(id)) {
             allowed.insert(id);
@@ -45,8 +50,7 @@ pub async fn sanitize_mentions(
             "<filtered>".into()
         }
     });
-    let roles = regex::Regex::new(r"<@&\d+>").unwrap();
-    let text = roles
+    let text = ROLE_MENTION_RE
         .replace_all(&text, "<filtered>")
         .replace("@everyone", "@\u{200b}everyone")
         .replace("@here", "@\u{200b}here");
@@ -63,7 +67,7 @@ pub async fn send_roast(
     channel_id: serenity::ChannelId,
     text: &str,
     allowed_users: &[serenity::UserId],
-) -> Result<(), serenity::Error> {
+) -> Result<(), crate::error::BotError> {
     const LIMIT: usize = 2000;
     let mut remaining = text;
     while !remaining.is_empty() {

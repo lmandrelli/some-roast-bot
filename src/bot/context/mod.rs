@@ -113,14 +113,12 @@ pub async fn fetch_channel_context(
         if !raw.iter().any(|m| m.id == replied.id) {
             raw.push(replied.clone());
         }
-    } else if let Some(reference) = &trigger.message_reference {
-        if let Some(id) = reference.message_id {
-            if !raw.iter().any(|m| m.id == id) {
-                if let Ok(message) = channel_id.message(&ctx.http, id).await {
-                    raw.push(message);
-                }
-            }
-        }
+    } else if let Some(reference) = &trigger.message_reference
+        && let Some(id) = reference.message_id
+        && !raw.iter().any(|m| m.id == id)
+        && let Ok(message) = channel_id.message(&ctx.http, id).await
+    {
+        raw.push(message);
     }
     raw.sort_by_key(|m| (m.timestamp.unix_timestamp(), m.id.get()));
     raw.dedup_by_key(|m| m.id);
@@ -146,14 +144,14 @@ pub async fn fetch_channel_context(
                     .and_then(|g| g.members.get(&user.id).and_then(|m| m.nick.clone()))
             });
         }
-        if name.is_none() {
-            if let Some(gid) = guild_id {
-                name = gid
-                    .member(&ctx.http, user.id)
-                    .await
-                    .ok()
-                    .and_then(|m| m.nick);
-            }
+        if name.is_none()
+            && let Some(gid) = guild_id
+        {
+            name = gid
+                .member(&ctx.http, user.id)
+                .await
+                .ok()
+                .and_then(|m| m.nick);
         }
         identities.insert(
             user.id,
@@ -225,13 +223,13 @@ pub async fn fetch_channel_context(
             }
         }
         for s in &stickers {
-            if !s.format.to_lowercase().contains("lottie") {
-                if let Some(url) = &s.url {
-                    visuals.push(Visual {
-                        url: url.clone(),
-                        mime: None,
-                    });
-                }
+            if !s.format.to_lowercase().contains("lottie")
+                && let Some(url) = &s.url
+            {
+                visuals.push(Visual {
+                    url: url.clone(),
+                    mime: None,
+                });
             }
         }
         for e in &embeds {
@@ -446,7 +444,7 @@ mod tests {
     }
 
     #[test]
-    fn transcript_places_description_on_owner_and_omits_visual_url() {
+    fn transcript_omits_visual_url() {
         let url = "https://cdn.discordapp.com/attachments/1/cat.png?ex=signed";
         let mut owner = message(1, false, false, &[url]);
         owner.attachments.push(AttachmentData {
@@ -458,17 +456,8 @@ mod tests {
             height: Some(10),
             url: url.into(),
         });
-        let descriptions =
-            HashMap::from([(canonical_image_key(url), "Un chat devant un écran".into())]);
-        let formatted =
-            formatter::format_transcript_message_with_descriptions(&owner, &descriptions);
-        assert!(formatted.contains("visual_description: Un chat devant un écran"));
+        let formatted = formatter::format_transcript_message(&owner);
+        assert!(formatted.contains("filename=\"cat.png\""));
         assert!(!formatted.contains(url));
-
-        let other = formatter::format_transcript_message_with_descriptions(
-            &message(2, false, false, &[]),
-            &descriptions,
-        );
-        assert!(!other.contains("Un chat devant un écran"));
     }
 }

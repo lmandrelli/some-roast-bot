@@ -42,14 +42,11 @@ impl MessageHandler for ChannelHandler {
         let channel_ctx =
             context::fetch_channel_context(ctx.serenity_ctx, msg.channel_id, msg).await?;
 
-        let output =
-            crate::agents::roast_channel(&ctx.llm_service, ctx.memory.as_ref(), &channel_ctx)
-                .await?;
+        let output = crate::agents::roast_channel(&ctx.llm_service, &channel_ctx).await?;
 
         ctx.memory
             .record_roast(&triggerer_id, None, "general")
-            .await
-            .map_err(|e| BotError::Db(e))?;
+            .await?;
 
         Ok(Some(output.response))
     }

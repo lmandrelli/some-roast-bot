@@ -1,18 +1,20 @@
 use super::{FixedLink, Platform};
 use regex::Regex;
+use std::sync::LazyLock;
 
 static FIX_BASE: &str = "https://rxddit.com";
 
+static LONG_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"https?://(?:www\.)?reddit\.com/r/(\w+)/comments/(\w+)(?:/\w+)?"#).unwrap()
+});
+static SHORT_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"https?://(?:www\.)?redd\.it/(\w+)"#).unwrap());
+
 /// Extract Reddit links and rewrite them to rxddit.com.
 pub fn fix(text: &str) -> Vec<FixedLink> {
-    let re_long =
-        Regex::new(r#"https?://(?:www\.)?reddit\.com/r/(\w+)/comments/(\w+)(?:/\w+)?"#).unwrap();
-
-    let re_short = Regex::new(r#"https?://(?:www\.)?redd\.it/(\w+)"#).unwrap();
-
     let mut results = Vec::new();
 
-    for caps in re_long.captures_iter(text) {
+    for caps in LONG_RE.captures_iter(text) {
         let original = caps.get(0).unwrap().as_str().to_string();
         let sub = &caps[1];
         let post_id = &caps[2];
@@ -26,7 +28,7 @@ pub fn fix(text: &str) -> Vec<FixedLink> {
         });
     }
 
-    for caps in re_short.captures_iter(text) {
+    for caps in SHORT_RE.captures_iter(text) {
         let original = caps.get(0).unwrap().as_str().to_string();
         let post_id = &caps[1];
 
