@@ -19,7 +19,7 @@ pub async fn stats(ctx: poise::Context<'_, Data, Error>) -> Result<(), Error> {
 
 async fn format_stats(memory: &dyn MemoryRepository) -> (String, String) {
     let roast_types = [
-        ("channel", "Roast par mention de Some(roast)"),
+        ("general", "Roast par mention de Some(roast)"),
         ("user", "Roast par mention d'un utilisateur"),
         ("reply", "Roast par réponse à un message"),
         ("truth", "is this true?"),
