@@ -28,7 +28,7 @@ A sarcastic Discord bot that roasts users while answering their questions. Power
 ### Passive Triggers (no mention required)
 
 - **Social Media Embed Fixer** — Automatically detects Twitter/X, Bluesky, Instagram, Reddit, and TikTok links. Suppresses the original broken/paywalled embed and replies with a fixed embed-friendly URL. For Twitter/X and Bluesky, it intelligently translates non-English/French posts to French via the FxEmbed API.
-- **Microsoft/Windows Auto-Roast** — Whenever anyone mentions "Microsoft" or "Windows", the bot automatically searches for the latest Microsoft fails/bugs and roasts them. Uses a SQLite memory to avoid repeating topics. Refers to Microsoft as "Microslop" and Windows as "Windaube".
+- **Microsoft/Windows Auto-Roast** — Whenever anyone mentions "Microsoft" or "Windows", the bot automatically searches for the latest Microsoft fails/bugs and roasts them. Uses the memory database to avoid repeating topics. Refers to Microsoft as "Microslop" and Windows as "Windaube".
 - **"Is this true?" Detector** — Detects phrases like "is this true?" or "is that true?", reads recent channel messages, and judges whether the claim is true, false, or nonsense — roast-style.
 
 ### Mention-Required Triggers
@@ -83,6 +83,7 @@ cp .env.example .env
 | `VISION_MODEL_NAME` | Vision model used to describe images before roasts   | `@preset/mimo-v2-5-on-xiaomi` |
 | `PROD`           | Production flag (`1` = prod, `0` = dev status display)  | `1`                             |
 | `MEMORY_DB_PATH` | Path to the SQLite memory database                      | `data/memory.db`                |
+| `DATABASE_URL`   | Postgres URL (`postgres://user:pass@host:5432/db`). When set, replaces SQLite and `MEMORY_DB_PATH` is ignored | *(unset: SQLite)* |
 
 > **Note:** The bot reads these variables at startup via [`dotenv`](https://crates.io/crates/dotenv). Never commit your `.env` file.
 
@@ -111,7 +112,9 @@ Once running, invite the bot to your server using the OAuth2 URL, then:
 ```
 src/
 ├── main.rs              # Startup wiring: env, framework, bot launch
-├── memory.rs            # SQLite-backed topic deduplication + link-fix reply tracking
+├── db/
+│   ├── mod.rs           # MemoryRepository trait
+│   └── sql.rs           # sqlx repository (SQLite or Postgres)
 ├── models/
 │   └── fxtwitter.rs     # FxEmbed API response structs
 ├── fixers/
@@ -153,7 +156,7 @@ src/
 - **`poise` + `serenity`** — Discord bot framework and gateway client.
 - **`rig-core`** — Agent builder that composes the LLM model with MCP tools.
 - **`rmcp`** — MCP client that connects to Exa's search server and exposes web-search tools to the agent.
-- **`rusqlite`** — SQLite database for topic deduplication memory (Microsoft roast).
+- **`sqlx`** — Memory database (topics, stats, image descriptions) on SQLite by default or Postgres with `DATABASE_URL`. Migrations per backend live in `migrations/sqlite` and `migrations/postgres` and run at startup.
 
 **Design notes:**
 

@@ -5,7 +5,7 @@ use crate::db::MemoryRepository;
 use crate::error::LlmError;
 
 /// Roast when someone mentions Microsoft or Windows in a message.
-/// Uses Exa web search to find latest Microsoft news and SQLite memory
+/// Uses Exa web search to find latest Microsoft news and the memory database
 /// to avoid repeating the same topics.
 pub async fn roast_microsoft(
     llm_service: &LlmService,
@@ -15,6 +15,7 @@ pub async fn roast_microsoft(
 ) -> Result<RoastOutput, LlmError> {
     let past_topics = memory
         .recent_topics(10)
+        .await
         .map_err(|e| LlmError::Completion(e.to_string()))?;
 
     let topics_section = if past_topics.is_empty() {
@@ -58,7 +59,7 @@ pub async fn roast_microsoft(
 
     if let Some(ref topic) = output.topic {
         tracing::info!("Storing microsoft news topic: {topic}");
-        let _ = memory.remember_topic(topic);
+        let _ = memory.remember_topic(topic).await;
     }
 
     Ok(output)

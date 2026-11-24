@@ -58,6 +58,7 @@ impl MessageHandler for ReplyHandler {
                 Some(&output.mention_id),
                 "reply",
             )
+            .await
             .map_err(|e| BotError::Db(e))?;
 
         Ok(Some(format!("<@{}> {}", output.mention_id, output.roast)))

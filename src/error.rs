@@ -26,10 +26,10 @@ pub enum BotError {
 
 #[derive(Debug, thiserror::Error)]
 #[error("Database operation failed: {0}")]
-pub struct DbError(pub rusqlite::Error);
+pub struct DbError(pub sqlx::Error);
 
-impl From<rusqlite::Error> for DbError {
-    fn from(e: rusqlite::Error) -> Self {
+impl From<sqlx::Error> for DbError {
+    fn from(e: sqlx::Error) -> Self {
         DbError(e)
     }
 }

@@ -9,6 +9,7 @@ pub struct Config {
     pub vision_model_name: String,
     pub is_prod: bool,
     pub memory_db_path: PathBuf,
+    pub database_url: Option<String>,
     pub magic_word: String,
 }
 
@@ -40,6 +41,10 @@ impl Config {
             .map(PathBuf::from)
             .unwrap_or_else(|_| PathBuf::from("data/memory.db"));
 
+        let database_url = std::env::var("DATABASE_URL")
+            .ok()
+            .filter(|url| !url.is_empty());
+
         let magic_word = std::env::var("MAGIC_WORD")
             .unwrap_or_else(|_| "magic".to_string())
             .to_lowercase();
@@ -52,6 +57,7 @@ impl Config {
             vision_model_name,
             is_prod,
             memory_db_path,
+            database_url,
             magic_word,
         })
     }

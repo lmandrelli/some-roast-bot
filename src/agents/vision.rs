@@ -255,7 +255,7 @@ pub async fn describe_context_visuals(
     let mut misses = Vec::new();
     for (index, original) in originals.into_iter().enumerate() {
         let key = canonical_image_key(&original.url);
-        match memory.image_description(&key) {
+        match memory.image_description(&key).await {
             Ok(Some(description)) if !description.trim().is_empty() => {
                 descriptions.insert(key, description);
             }
@@ -310,11 +310,10 @@ pub async fn describe_context_visuals(
             continue;
         };
         descriptions.insert(prepared.canonical_key.clone(), description.clone());
-        if let Err(error) = memory.remember_image_description(
-            &prepared.canonical_key,
-            &prepared.source_url,
-            &description,
-        ) {
+        if let Err(error) = memory
+            .remember_image_description(&prepared.canonical_key, &prepared.source_url, &description)
+            .await
+        {
             tracing::warn!(image_position = position, source_host = %prepared.source_host, detected_format = prepared.format.label(), byte_size = prepared.byte_size, failure_stage = "cache-write", "vision image cache write failed: {error}");
         }
     }

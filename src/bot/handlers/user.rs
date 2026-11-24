@@ -72,6 +72,7 @@ impl MessageHandler for UserHandler {
 
         ctx.memory
             .record_roast(&msg.author.id.to_string(), Some(&output.mention_id), "user")
+            .await
             .map_err(|e| BotError::Db(e))?;
 
         Ok(Some(format!("<@{}> {}", output.mention_id, output.roast)))
