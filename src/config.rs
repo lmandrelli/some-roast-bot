@@ -6,7 +6,6 @@ pub struct Config {
     pub openai_api_key: String,
     pub openai_base_url: String,
     pub model_name: String,
-    pub vision_model_name: String,
     pub status_message: String,
     pub memory_db_path: PathBuf,
     pub database_url: Option<String>,
@@ -32,12 +31,6 @@ impl Config {
 
         let model_name = std::env::var("MODEL_NAME")
             .unwrap_or_else(|_| "@preset/mimo-v2-5-pro-on-xiaomi".to_string());
-        // Multimodal models describe images themselves; set VISION_MODEL_NAME
-        // only when MODEL_NAME cannot read images.
-        let vision_model_name = std::env::var("VISION_MODEL_NAME")
-            .ok()
-            .filter(|name| !name.is_empty())
-            .unwrap_or_else(|| model_name.clone());
 
         let status_message = std::env::var("STATUS_MESSAGE")
             .ok()
@@ -61,7 +54,6 @@ impl Config {
             openai_api_key,
             openai_base_url,
             model_name,
-            vision_model_name,
             status_message,
             memory_db_path,
             database_url,

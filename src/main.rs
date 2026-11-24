@@ -26,6 +26,9 @@ async fn main() -> Result<(), BotError> {
     if std::env::var_os("PROD").is_some() {
         tracing::warn!("PROD is ignored: set STATUS_MESSAGE to change the Discord status");
     }
+    if std::env::var_os("VISION_MODEL_NAME").is_some() {
+        tracing::warn!("VISION_MODEL_NAME is ignored: MODEL_NAME receives the images directly");
+    }
     let memory = Arc::new(
         SqlMemoryRepository::connect(config.database_url.as_deref(), &config.memory_db_path)
             .await?,

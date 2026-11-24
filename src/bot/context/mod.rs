@@ -446,7 +446,7 @@ mod tests {
     }
 
     #[test]
-    fn transcript_places_description_on_owner_and_omits_visual_url() {
+    fn transcript_omits_visual_url() {
         let url = "https://cdn.discordapp.com/attachments/1/cat.png?ex=signed";
         let mut owner = message(1, false, false, &[url]);
         owner.attachments.push(AttachmentData {
@@ -458,17 +458,8 @@ mod tests {
             height: Some(10),
             url: url.into(),
         });
-        let descriptions =
-            HashMap::from([(canonical_image_key(url), "Un chat devant un écran".into())]);
-        let formatted =
-            formatter::format_transcript_message_with_descriptions(&owner, &descriptions);
-        assert!(formatted.contains("visual_description: Un chat devant un écran"));
+        let formatted = formatter::format_transcript_message(&owner);
+        assert!(formatted.contains("filename=\"cat.png\""));
         assert!(!formatted.contains(url));
-
-        let other = formatter::format_transcript_message_with_descriptions(
-            &message(2, false, false, &[]),
-            &descriptions,
-        );
-        assert!(!other.contains("Un chat devant un écran"));
     }
 }
