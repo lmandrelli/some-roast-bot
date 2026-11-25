@@ -17,10 +17,15 @@ pub async fn roast_channel(
         trigger,
         llm.magic_word(),
     );
+    // The reply hint names a target to roast: never in easter-egg mode.
     let intent = if crate::agents::preambles::trigger_active(trigger, llm.magic_word()) {
-        "The easter egg is active. Respond warmly to the trigger and do not roast."
+        "The easter egg is active. Respond warmly to the trigger and do not roast.".to_string()
     } else {
-        "Inspect the trigger first and fulfill its roast intent. A target may be a guild member, external person, object, image, or idea. A mention or reply is context, not necessarily the target. If no target is requested, choose the most roastable subject from context."
+        let intent = "Roast what the [TRIGGER] asks for, following HOW TO PICK THE TARGET.";
+        match super::reply_hint(context) {
+            Some(hint) => format!("{intent}\n{hint}"),
+            None => intent.to_string(),
+        }
     };
-    try_roast_with_retry(llm, &preamble, intent, context).await
+    try_roast_with_retry(llm, &preamble, &intent, context).await
 }

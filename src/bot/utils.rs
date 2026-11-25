@@ -62,40 +62,80 @@ pub async fn sanitize_mentions(
     }
 }
 
+/// Discord message length limit (counted in bytes here, which is stricter).
+const MESSAGE_LIMIT: usize = 2000;
+
+/// Split `text` into Discord-sized chunks, on whitespace when possible.
+pub fn split_message(text: &str) -> Vec<&str> {
+    let mut chunks = Vec::new();
+    let mut remaining = text.trim();
+    while !remaining.is_empty() {
+        let end = if remaining.len() <= MESSAGE_LIMIT {
+            remaining.len()
+        } else {
+            let mut end = MESSAGE_LIMIT;
+            while !remaining.is_char_boundary(end) {
+                end -= 1;
+            }
+            remaining[..end]
+                .rfind(char::is_whitespace)
+                .filter(|&i| i > 0)
+                .unwrap_or(end)
+        };
+        chunks.push(&remaining[..end]);
+        remaining = remaining[end..].trim_start();
+    }
+    chunks
+}
+
+/// Only the sanitized users may be pinged: no roles, no @everyone.
+pub fn allowed_mentions(allowed_users: &[serenity::UserId]) -> serenity::CreateAllowedMentions {
+    serenity::CreateAllowedMentions::new()
+        .all_users(false)
+        .all_roles(false)
+        .everyone(false)
+        .users(allowed_users.to_vec())
+        .replied_user(false)
+}
+
 pub async fn send_roast(
     ctx: &serenity::Context,
     channel_id: serenity::ChannelId,
     text: &str,
     allowed_users: &[serenity::UserId],
 ) -> Result<(), crate::error::BotError> {
-    const LIMIT: usize = 2000;
-    let mut remaining = text;
-    while !remaining.is_empty() {
-        let end = if remaining.len() <= LIMIT {
-            remaining.len()
-        } else {
-            let mut end = LIMIT;
-            while !remaining.is_char_boundary(end) {
-                end -= 1;
-            }
-            remaining[..end].rfind(char::is_whitespace).unwrap_or(end)
-        };
-        let chunk = &remaining[..end];
-        let mentions = serenity::CreateAllowedMentions::new()
-            .all_users(false)
-            .all_roles(false)
-            .everyone(false)
-            .users(allowed_users.to_vec())
-            .replied_user(false);
+    for chunk in split_message(text) {
         channel_id
             .send_message(
                 &ctx.http,
                 serenity::CreateMessage::new()
                     .content(chunk)
-                    .allowed_mentions(mentions),
+                    .allowed_mentions(allowed_mentions(allowed_users)),
             )
             .await?;
-        remaining = remaining[end..].trim_start();
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn split_message_keeps_chunks_under_the_limit_on_whitespace() {
+        assert_eq!(split_message("  court  "), vec!["court"]);
+        assert!(split_message("   ").is_empty());
+        let long = format!("{} {}", "é".repeat(900), "a".repeat(400));
+        let chunks = split_message(&long);
+        assert_eq!(
+            chunks,
+            vec!["é".repeat(900).as_str(), "a".repeat(400).as_str()]
+        );
+        let unbroken = "x".repeat(4500);
+        let chunks = split_message(&unbroken);
+        assert_eq!(
+            chunks.iter().map(|c| c.len()).collect::<Vec<_>>(),
+            vec![2000, 2000, 500]
+        );
+    }
 }

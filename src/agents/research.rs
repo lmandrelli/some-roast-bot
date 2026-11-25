@@ -1,28 +1,22 @@
-use rig::completion::Prompt;
-
 use crate::agents::llm::LlmService;
+use crate::bot::context::{AuthorIdentity, ChannelContext};
 use crate::error::LlmError;
 
 /// Research a topic with web search.
-pub async fn research(llm_service: &LlmService, question: &str) -> Result<String, LlmError> {
-    let preamble = crate::agents::preambles::with_question(
-        &crate::agents::preambles::select_preamble(
-            crate::agents::preambles::RESEARCH,
-            Some(question),
-            llm_service.magic_word(),
-        ),
-        chrono::Utc::now().date_naive(),
-    );
-
-    let (agent, _mcp_session) = llm_service.build_agent(&preamble).await?;
-
-    tracing::info!("Sending /research prompt to model...");
-    let response = agent
-        .prompt(question)
-        .max_turns(4)
-        .await
-        .map_err(|e| LlmError::Completion(e.to_string()))?;
-
-    tracing::info!("/research response received: {} chars", response.len());
-    Ok(response)
+pub async fn research(
+    llm_service: &LlmService,
+    asker: &AuthorIdentity,
+    question: &str,
+    context: &ChannelContext,
+) -> Result<String, LlmError> {
+    crate::agents::ask::answer(
+        llm_service,
+        crate::agents::preambles::RESEARCH,
+        "/research",
+        asker,
+        question,
+        context,
+        6,
+    )
+    .await
 }

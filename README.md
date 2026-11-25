@@ -21,8 +21,8 @@ A sarcastic Discord bot that roasts users while answering their questions. It ta
 
 ### Slash Command
 
-- **`/ask <question>`** — Asks the AI a question. The agent searches the web via Exa MCP, then responds with a sarcastic roast that also contains the actual answer.
-- **`/research <question>`** — Longer answer in markdown, after up to three web searches.
+- **`/ask <question>`** — Asks the AI a question. The agent reads the last 15 messages of the channel, searches the web via Exa MCP when needed, then answers with a tease that also contains the actual answer.
+- **`/research <question>`** — Longer answer in markdown with sources, after up to three web searches.
 - **`/fix <url>`** — Manually fix a social media link and get the embed-friendly version back.
 - **`/stats`** — Show usage statistics for all bot features (roasts, social links, etc.).
 
@@ -35,7 +35,7 @@ A sarcastic Discord bot that roasts users while answering their questions. It ta
 
 ### Mention-Required Trigger
 
-- **Roast** — Mention the bot. It reads the recent messages and their images, works out what the trigger asks for (a member, someone outside, an object, an image, an idea; a reply or a second mention is context), and roasts it. With no explicit target, it picks the most roastable subject.
+- **Roast** — Mention the bot. It reads the last 20 messages, their images and link previews, and roasts what the trigger asks for: the message it replies to (even with just "."), an explicit target ("roast @X", "roast cette image"), or else the most roastable subject of the conversation.
 
 ---
 
@@ -132,11 +132,14 @@ src/
 │   ├── mod.rs           # Re-exports
 │   ├── llm/mod.rs       # LlmService: model + Exa MCP tools
 │   ├── preambles.rs     # System prompts (shared persona) + magic-word override
+│   ├── prompt.rs        # One user message: instruction, transcript, images
 │   ├── images.rs        # Downloads and checks the context images
+│   ├── links.rs         # Previews links Discord did not preview (trigger, replied message)
+│   ├── eval.rs          # Prompt evaluation on made-up conversations (ignored test)
 │   ├── ask.rs           # /ask agent
 │   ├── research.rs      # /research agent
 │   └── roast/
-│       ├── mod.rs       # Prompt (transcript + images) and JSON retry loop
+│       ├── mod.rs       # Reply hint and JSON retry loop
 │       ├── channel.rs   # Intent-first roast on mention
 │       ├── truth.rs     # Judge "is this true?" claims
 │       └── microsoft.rs # Auto-roast on Microsoft/Windows mentions (web search + topic memory)
@@ -165,7 +168,10 @@ src/
 **Design notes:**
 
 - **Stateless agents** — Each request cold-starts a new MCP connection and rig agent. Everything is dropped when the call completes, so there is no shared state or long-lived connection to manage.
-- **One call per roast** — The model gets the transcript and the images (at most 10, trigger and reply target first) in the same prompt, each image right after the message that posted it. Text and images are marked as untrusted data.
+- **One call per roast** — The model gets the transcript and the images (at most 10, trigger and reply target first) in the same prompt, each image right after the message that posted it. Text, images and pages are marked as untrusted data.
+- **Transcript** — Messages are numbered with their age ("12 min ago"), replies point to the number they answer, the trigger quotes the message it replies to, and the bot's own messages are marked so it does not repeat a joke. The current date is given for news and fact checks.
+- **Link previews** — Discord often delivers the trigger before its embed. For the trigger and the message it replies to, the bot reads the title and description of up to 3 links itself (5 s, 512 KB). Every hop, redirects included, is resolved first and refused if any address is private, loopback, link-local or CGNAT; the connection is pinned to the checked address. The model can still open other pages with Exa.
+- **Evaluation** — `cargo test eval -- --ignored --nocapture` replays made-up conversations against the configured model (`EVAL_CASE` picks cases); `cargo test replay -- --ignored --nocapture` rebuilds the transcript of a real conversation exported from the Discord API and prints it with two roasts, without posting. Compare on both before changing a prompt.
 - **Priority-based dispatch** — Event handlers are checked in order: social media links > quoi > Microsoft keywords > truth questions > roast on mention.
 - **Smart translation** — Twitter/X and Bluesky links are translated to French only when the detected language is neither English nor French, using the FxEmbed API.
 - **Separation of concerns** — `agents/` contains pure async LLM logic (no Discord awareness). `bot/` handles all Discord interaction. `fixers/` handles link detection and rewriting independently.

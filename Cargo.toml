@@ -1,13 +1,13 @@
 [package]
 name = "some-roast-bot"
-version = "0.10.0"
+version = "0.11.0"
 edition = "2024"
 authors = ["Luca Mandrelli"]
 
 [dependencies]
 poise = { version = "0.6.1" }
 serenity = { version = "0.12" }
-tokio = { version = "1.50", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.50", features = ["rt-multi-thread", "macros", "net"] }
 dotenvy = "0.15"
 regex = "1"
 reqwest = { version = "0.12", features = ["json"] }

@@ -16,11 +16,12 @@ pub async fn roast_truth(
         trigger,
         llm.magic_word(),
     );
-    try_roast_with_retry(
-        llm,
-        &preamble,
-        "Verify and answer the claim requested by the trigger.",
-        context,
-    )
-    .await
+    let mut intent = "Verify and answer the claim requested by the trigger.".to_string();
+    // The reply hint names a target to roast: never in easter-egg mode.
+    if !crate::agents::preambles::trigger_active(trigger, llm.magic_word())
+        && let Some(hint) = super::reply_hint(context)
+    {
+        intent = format!("{intent}\n{hint}");
+    }
+    try_roast_with_retry(llm, &preamble, &intent, context).await
 }
