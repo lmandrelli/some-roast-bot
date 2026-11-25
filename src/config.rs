@@ -6,6 +6,9 @@ pub struct Config {
     pub openai_api_key: String,
     pub openai_base_url: String,
     pub model_name: String,
+    /// OpenRouter provider endpoints allowed for `model_name`, tried in order
+    /// with no fallback to others. Empty: OpenRouter picks.
+    pub model_providers: Vec<String>,
     pub status_message: String,
     pub memory_db_path: PathBuf,
     pub database_url: Option<String>,
@@ -34,6 +37,9 @@ impl Config {
             .filter(|name| !name.is_empty())
             .ok_or_else(|| ConfigError::MissingVar("MODEL_NAME".into()))?;
 
+        let model_providers =
+            parse_providers(&std::env::var("MODEL_PROVIDERS").unwrap_or_default());
+
         let status_message = std::env::var("STATUS_MESSAGE")
             .ok()
             .filter(|message| !message.is_empty())
@@ -56,10 +62,34 @@ impl Config {
             openai_api_key,
             openai_base_url,
             model_name,
+            model_providers,
             status_message,
             memory_db_path,
             database_url,
             magic_word,
         })
+    }
+}
+
+/// Split a comma-separated provider list, dropping blanks.
+fn parse_providers(raw: &str) -> Vec<String> {
+    raw.split(',')
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .map(String::from)
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_providers;
+
+    #[test]
+    fn parses_provider_list() {
+        assert_eq!(
+            parse_providers(" z-ai/fp8, fireworks ,,"),
+            vec!["z-ai/fp8".to_string(), "fireworks".to_string()]
+        );
+        assert!(parse_providers("").is_empty());
     }
 }

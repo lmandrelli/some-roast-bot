@@ -11,6 +11,7 @@ pub type McpSession = rmcp::service::RunningService<rmcp::RoleClient, ClientInfo
 
 pub struct LlmService {
     model_name: String,
+    model_providers: Vec<String>,
     magic_word: String,
 }
 
@@ -18,6 +19,7 @@ impl LlmService {
     pub fn new(config: &Config) -> Self {
         Self {
             model_name: config.model_name.clone(),
+            model_providers: config.model_providers.clone(),
             magic_word: config.magic_word.clone(),
         }
     }
@@ -63,11 +65,39 @@ impl LlmService {
             tools.tools.iter().map(|t| &t.name).collect::<Vec<_>>()
         );
 
-        let agent = rig::agent::AgentBuilder::new(model)
+        let mut builder = rig::agent::AgentBuilder::new(model)
             .preamble(preamble)
-            .rmcp_tools(tools.tools, service.peer().clone())
-            .build();
+            .rmcp_tools(tools.tools, service.peer().clone());
+        if let Some(routing) = provider_routing(&self.model_providers) {
+            builder = builder.additional_params(routing);
+        }
+        let agent = builder.build();
 
         Ok((agent, service))
+    }
+}
+
+/// OpenRouter `provider` routing: only these endpoints, in this order.
+fn provider_routing(providers: &[String]) -> Option<serde_json::Value> {
+    (!providers.is_empty()).then(|| {
+        serde_json::json!({
+            "provider": { "order": providers, "allow_fallbacks": false }
+        })
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::provider_routing;
+
+    #[test]
+    fn routes_only_listed_providers_in_order() {
+        assert_eq!(provider_routing(&[]), None);
+        assert_eq!(
+            provider_routing(&["z-ai/fp8".into(), "fireworks".into()]).unwrap(),
+            serde_json::json!({
+                "provider": { "order": ["z-ai/fp8", "fireworks"], "allow_fallbacks": false }
+            })
+        );
     }
 }

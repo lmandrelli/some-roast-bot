@@ -49,7 +49,8 @@ pub async fn roast_microsoft(
         )
     } else {
         format!(
-            "{author} mentioned Microsoft or Windows. Destroy them. \
+            "{author} mentioned Microsoft or Windows. Roast Microslop/Windaube \
+             about what they are talking about, using fresh news. \
              Remember: it's \"Microslop\" and \"Windaube\", always."
         )
     };
