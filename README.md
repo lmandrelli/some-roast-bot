@@ -79,7 +79,8 @@ cp .env.example .env
 | `DISCORD_TOKEN`   | Discord bot token                                                 | *(required)*                       |
 | `OPENAI_API_KEY`  | API key of the OpenAI-compatible endpoint                        | *(required)*                       |
 | `OPENAI_BASE_URL` | Base URL of the OpenAI-compatible endpoint                       | `https://openrouter.ai/api/v1`     |
-| `MODEL_NAME`      | Model (or OpenRouter `@preset/<slug>`). Must accept images: they are sent with the transcript | *(required)*                       |
+| `MODEL_NAME`      | Model (or OpenRouter `@preset/<slug>`) used by every agent. Must accept images: they are sent with the transcript. Recommended: `z-ai/glm-5.3-flash` | *(required)*                       |
+| `MODEL_PROVIDERS` | OpenRouter only: comma-separated provider endpoints allowed for `MODEL_NAME`, tried in order with no fallback to others. Recommended: `z-ai/fp8,fireworks` | *(unset: OpenRouter picks)* |
 | `STATUS_MESSAGE`  | Discord custom status                                             | `don't try to talk about Microslop` |
 | `MAGIC_WORD`      | Word that switches every agent to a friendly easter-egg mode     | `magic`                            |
 | `MEMORY_DB_PATH`  | SQLite memory database                                            | `data/memory.db`                   |
@@ -130,7 +131,7 @@ src/
 ├── agents/
 │   ├── mod.rs           # Re-exports
 │   ├── llm/mod.rs       # LlmService: model + Exa MCP tools
-│   ├── preambles.rs     # System prompts + magic-word override
+│   ├── preambles.rs     # System prompts (shared persona) + magic-word override
 │   ├── images.rs        # Downloads and checks the context images
 │   ├── ask.rs           # /ask agent
 │   ├── research.rs      # /research agent
