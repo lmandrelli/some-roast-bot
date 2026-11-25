@@ -29,13 +29,18 @@ pub fn reply_hint(context: &ChannelContext) -> Option<String> {
         .map(|a| a.name.as_str())
         .unwrap_or("quelqu'un");
     Some(match context.messages.iter().position(|m| m.id == *id) {
+        Some(index) if crate::bot::context::is_bare(&trigger.content) => format!(
+            "Le DÉCLENCHEUR ne dit rien d'autre que ta mention : il te montre le message #{} de {author}. Roaste {author} sur ce message, y compris ce que montrent son lien, son image ou le message transféré.",
+            index + 1
+        ),
         Some(index) => format!(
             "Le DÉCLENCHEUR répond au message #{} de {author} : c'est ta cible, sauf si le déclencheur en désigne clairement une autre.",
             index + 1
         ),
-        None => format!(
-            "Le DÉCLENCHEUR répond à un message de {author} absent du contexte : appuie-toi sur le reste de la conversation."
+        None if trigger.reply_quote.is_some() => format!(
+            "Le DÉCLENCHEUR répond à un message plus ancien de {author}, cité sur sa ligne « ↳ » : c'est ta cible, sauf si le déclencheur en désigne clairement une autre."
         ),
+        None => "Le DÉCLENCHEUR répond à un message supprimé : déduis la cible de la conversation récente.".to_string(),
     })
 }
 

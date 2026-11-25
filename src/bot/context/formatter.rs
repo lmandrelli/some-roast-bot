@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use poise::serenity_prelude as serenity;
 
-use crate::bot::context::{ChannelContext, EmbedData, TranscriptMessage};
+use crate::bot::context::{ChannelContext, EmbedData, TranscriptMessage, is_bare};
 
 /// Longest quote of a replied message repeated on the trigger.
 const REPLY_QUOTE_CHARS: usize = 300;
@@ -36,12 +36,12 @@ pub fn format_messages(ctx: &ChannelContext) -> Vec<String> {
     ctx.messages
         .iter()
         .enumerate()
-        .map(|(i, m)| format_message(ctx, m, i + 1, &index, reference))
+        .map(|(i, m)| format_message(&ctx.messages, m, i + 1, &index, reference))
         .collect()
 }
 
 fn format_message(
-    ctx: &ChannelContext,
+    messages: &[TranscriptMessage],
     m: &TranscriptMessage,
     number: usize,
     index: &HashMap<serenity::MessageId, usize>,
@@ -69,25 +69,39 @@ fn format_message(
         tags.join(" ")
     ));
     if let Some((id, author)) = &m.reply_to {
-        let author = author
-            .as_ref()
-            .map(|a| a.name.as_str())
-            .unwrap_or("inconnu");
-        match index.get(id) {
-            Some(target) if m.is_trigger => {
-                let quote = ctx
-                    .messages
-                    .get(target - 1)
-                    .map(|t| truncate(&t.content, REPLY_QUOTE_CHARS))
-                    .unwrap_or_default();
-                out.push_str(&format!("↳ répond à #{target} ({author}) : « {quote} »\n"));
+        let author = author.as_ref().map(|a| a.name.as_str());
+        // The reply payload carries the replied message even outside the
+        // window; the transcript copy is the fallback.
+        let quote = m
+            .reply_quote
+            .as_deref()
+            .or_else(|| index.get(id).map(|t| messages[t - 1].content.as_str()))
+            .filter(|q| !q.trim().is_empty())
+            .map(|q| format!(" : « {} »", truncate(q, REPLY_QUOTE_CHARS)))
+            .unwrap_or_default();
+        let author = author.unwrap_or("inconnu");
+        match (
+            index.get(id),
+            m.reply_to.as_ref().and_then(|(_, a)| a.as_ref()),
+        ) {
+            (Some(target), _) if m.is_trigger || is_bare(&m.content) => {
+                out.push_str(&format!("↳ répond à #{target} ({author}){quote}\n"))
             }
-            Some(target) => out.push_str(&format!("↳ répond à #{target} ({author})\n")),
-            None => out.push_str(&format!("↳ répond à un message plus ancien de {author}\n")),
+            (Some(target), _) => out.push_str(&format!("↳ répond à #{target} ({author})\n")),
+            (None, Some(_)) => out.push_str(&format!(
+                "↳ répond à un message plus ancien de {author}{quote}\n"
+            )),
+            (None, None) => out.push_str("↳ répond à un message supprimé\n"),
+        }
+        if is_bare(&m.content) && !quote.is_empty() {
+            out.push_str("(réponse sans texte : son auteur désigne ou reprend le message cité)\n");
         }
     }
     if !m.content.trim().is_empty() {
         out.push_str(&format!("{}\n", m.content.trim()));
+    }
+    for text in &m.forwarded {
+        out.push_str(&format!("[message transféré] {}\n", text.trim()));
     }
     let visual_urls = m
         .visuals

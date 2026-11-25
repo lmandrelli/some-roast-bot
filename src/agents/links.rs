@@ -35,11 +35,16 @@ pub async fn add_link_previews(context: &mut ChannelContext) {
         if !(message.is_trigger || message.is_reply_target) {
             continue;
         }
-        for url in urls(&message.content) {
-            let previewed = message
-                .embeds
-                .iter()
-                .any(|e| e.url.as_deref() == Some(url.as_str()) && e.title.is_some());
+        let text = std::iter::once(&message.content)
+            .chain(&message.forwarded)
+            .map(String::as_str)
+            .collect::<Vec<_>>()
+            .join("\n");
+        for url in urls(&text) {
+            let previewed = message.embeds.iter().any(|e| {
+                e.url.as_deref() == Some(url.as_str())
+                    && (e.title.is_some() || e.description.is_some())
+            });
             if !previewed && wanted.len() < LINK_LIMIT && !wanted.iter().any(|(_, u)| *u == url) {
                 wanted.push((index, url));
             }

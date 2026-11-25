@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::LazyLock;
 
 use poise::serenity_prelude as serenity;
 
@@ -64,6 +65,12 @@ pub struct TranscriptMessage {
     pub is_trigger: bool,
     pub is_reply_target: bool,
     pub reply_to: Option<(serenity::MessageId, Option<AuthorIdentity>)>,
+    /// Short text of the replied message, from the reply payload: it is
+    /// there even when that message is outside the fetched window.
+    pub reply_quote: Option<String>,
+    /// Text of the forwarded messages (Discord forwards keep the content in
+    /// snapshots, the message itself is empty).
+    pub forwarded: Vec<String>,
     pub attachments: Vec<AttachmentData>,
     pub stickers: Vec<StickerData>,
     pub embeds: Vec<EmbedData>,
@@ -105,7 +112,8 @@ pub async fn fetch_channel_context(
         if !raw.iter().any(|m| m.id == replied.id) {
             raw.push(replied.clone());
         }
-    } else if let Some(reference) = &trigger.message_reference
+    } else if is_reply(trigger)
+        && let Some(reference) = &trigger.message_reference
         && let Some(id) = reference.message_id
         && !raw.iter().any(|m| m.id == id)
         && let Ok(message) = channel_id.message(&ctx.http, id).await
@@ -120,16 +128,7 @@ pub async fn fetch_channel_context(
         raw.push(item);
     }
 
-    let reply_target_id = trigger
-        .referenced_message
-        .as_ref()
-        .map(|m| m.id)
-        .or_else(|| {
-            trigger
-                .message_reference
-                .as_ref()
-                .and_then(|r| r.message_id)
-        });
+    let reply_target_id = reply_id(trigger);
     build_context(
         ctx,
         channel_id,
@@ -205,85 +204,10 @@ async fn build_context(
         );
     }
 
-    let mut messages = Vec::new();
-    for message in &raw {
-        let content = expand_mentions(&message.content, &message.mentions, &identities);
-        let attachments = message
-            .attachments
-            .iter()
-            .map(|a| AttachmentData {
-                filename: a.filename.clone(),
-                description: a.description.clone(),
-                content_type: a.content_type.clone(),
-                url: a.url.clone(),
-            })
-            .collect::<Vec<_>>();
-        let stickers = message
-            .sticker_items
-            .iter()
-            .map(|s| StickerData {
-                name: s.name.clone(),
-                format: format!("{:?}", s.format_type),
-                url: s.image_url(),
-            })
-            .collect::<Vec<_>>();
-        let embeds = message.embeds.iter().map(embed_data).collect::<Vec<_>>();
-        let mut visuals = Vec::new();
-        for a in &attachments {
-            if a.content_type
-                .as_deref()
-                .is_some_and(|m| matches!(m, "image/png" | "image/jpeg" | "image/webp"))
-            {
-                visuals.push(Visual {
-                    url: a.url.clone(),
-                    mime: a.content_type.clone(),
-                });
-            }
-            if a.content_type.as_deref() == Some("image/gif") {
-                visuals.push(Visual {
-                    url: a.url.clone(),
-                    mime: a.content_type.clone(),
-                });
-            }
-        }
-        for s in &stickers {
-            if !s.format.to_lowercase().contains("lottie")
-                && let Some(url) = &s.url
-            {
-                visuals.push(Visual {
-                    url: url.clone(),
-                    mime: None,
-                });
-            }
-        }
-        for e in &embeds {
-            // Discord's static thumbnail is preferable to an animated embed image.
-            visuals.extend(e.thumbnail.clone());
-            visuals.extend(e.image.clone());
-        }
-        let reply_id = message
-            .message_reference
-            .as_ref()
-            .and_then(|r| r.message_id)
-            .or_else(|| message.referenced_message.as_ref().map(|m| m.id));
-        let reply_author = message
-            .referenced_message
-            .as_ref()
-            .and_then(|m| identities.get(&m.author.id).cloned());
-        messages.push(TranscriptMessage {
-            id: message.id,
-            timestamp: message.timestamp,
-            author: identities[&message.author.id].clone(),
-            content,
-            is_trigger: Some(message.id) == trigger_id,
-            is_reply_target: Some(message.id) == reply_target_id,
-            reply_to: reply_id.map(|id| (id, reply_author)),
-            attachments,
-            stickers,
-            embeds,
-            visuals,
-        });
-    }
+    let messages = raw
+        .iter()
+        .map(|m| transcript_message(m, &identities, self_id, trigger_id, reply_target_id))
+        .collect();
     let guild_name = guild_id
         .and_then(|id| ctx.cache.guild(id).map(|g| g.name.clone()))
         .unwrap_or_else(|| "Direct message".into());
@@ -310,6 +234,198 @@ async fn build_context(
         channel_description,
         messages,
     })
+}
+
+/// Pure conversion of one Discord message, given the resolved author names.
+pub fn transcript_message(
+    message: &serenity::Message,
+    identities: &HashMap<serenity::UserId, AuthorIdentity>,
+    self_id: serenity::UserId,
+    trigger_id: Option<serenity::MessageId>,
+    reply_target_id: Option<serenity::MessageId>,
+) -> TranscriptMessage {
+    let content = expand_mentions(&message.content, &message.mentions, identities);
+    let forwarded = message
+        .message_snapshots
+        .iter()
+        .map(|s| expand_mentions(&s.content, &s.mentions, identities))
+        .collect::<Vec<_>>();
+    let attachments = message
+        .attachments
+        .iter()
+        .chain(
+            message
+                .message_snapshots
+                .iter()
+                .flat_map(|s| &s.attachments),
+        )
+        .map(|a| AttachmentData {
+            filename: a.filename.clone(),
+            description: a.description.clone(),
+            content_type: a.content_type.clone(),
+            url: a.url.clone(),
+        })
+        .collect::<Vec<_>>();
+    let stickers = message
+        .sticker_items
+        .iter()
+        .chain(
+            message
+                .message_snapshots
+                .iter()
+                .flat_map(|s| &s.sticker_items),
+        )
+        .map(|s| StickerData {
+            name: s.name.clone(),
+            format: format!("{:?}", s.format_type),
+            url: s.image_url(),
+        })
+        .collect::<Vec<_>>();
+    let embeds = message
+        .embeds
+        .iter()
+        .chain(message.message_snapshots.iter().flat_map(|s| &s.embeds))
+        .map(embed_data)
+        .collect::<Vec<_>>();
+    let mut visuals = Vec::new();
+    for a in &attachments {
+        if a.content_type
+            .as_deref()
+            .is_some_and(|m| matches!(m, "image/png" | "image/jpeg" | "image/webp"))
+        {
+            visuals.push(Visual {
+                url: a.url.clone(),
+                mime: a.content_type.clone(),
+            });
+        }
+        if a.content_type.as_deref() == Some("image/gif") {
+            visuals.push(Visual {
+                url: a.url.clone(),
+                mime: a.content_type.clone(),
+            });
+        }
+    }
+    for s in &stickers {
+        if !s.format.to_lowercase().contains("lottie")
+            && let Some(url) = &s.url
+        {
+            visuals.push(Visual {
+                url: url.clone(),
+                mime: None,
+            });
+        }
+    }
+    for e in &embeds {
+        // Discord's static thumbnail is preferable to an animated embed image.
+        visuals.extend(e.thumbnail.clone());
+        visuals.extend(e.image.clone());
+    }
+    let reply_author = message.referenced_message.as_ref().map(|m| {
+        identities
+            .get(&m.author.id)
+            .cloned()
+            .unwrap_or_else(|| AuthorIdentity {
+                id: m.author.id,
+                name: m
+                    .author
+                    .global_name
+                    .clone()
+                    .unwrap_or_else(|| m.author.name.clone()),
+                is_bot: m.author.bot,
+                is_self: m.author.id == self_id,
+            })
+    });
+    TranscriptMessage {
+        id: message.id,
+        timestamp: message.timestamp,
+        author: identities[&message.author.id].clone(),
+        content,
+        is_trigger: Some(message.id) == trigger_id,
+        is_reply_target: Some(message.id) == reply_target_id,
+        reply_to: reply_id(message).map(|id| (id, reply_author)),
+        reply_quote: message.referenced_message.as_deref().map(quote_message),
+        forwarded,
+        attachments,
+        stickers,
+        embeds,
+        visuals,
+    }
+}
+
+static MENTION_RE: LazyLock<regex::Regex> =
+    LazyLock::new(|| regex::Regex::new(r"@[^@\n]*?\(<@!?\d+>\)|<@!?\d+>").unwrap());
+
+/// True when a message says nothing besides mentions and punctuation, like
+/// "." or "@Some(roast) ." sent as a reply to point at a message.
+pub fn is_bare(content: &str) -> bool {
+    !MENTION_RE
+        .replace_all(content, "")
+        .chars()
+        .any(char::is_alphanumeric)
+}
+
+/// A reply, as opposed to a forward: both use `message_reference`.
+fn is_reply(message: &serenity::Message) -> bool {
+    message
+        .message_reference
+        .as_ref()
+        .is_some_and(|r| matches!(r.kind, serenity::MessageReferenceKind::Default))
+}
+
+pub(crate) fn reply_id(message: &serenity::Message) -> Option<serenity::MessageId> {
+    if !is_reply(message) {
+        return None;
+    }
+    message
+        .referenced_message
+        .as_ref()
+        .map(|m| m.id)
+        .or_else(|| {
+            message
+                .message_reference
+                .as_ref()
+                .and_then(|r| r.message_id)
+        })
+}
+
+/// One line describing a replied message: text, forwarded text, link
+/// previews and attachment names.
+fn quote_message(message: &serenity::Message) -> String {
+    let clean = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut parts = vec![clean(&message.content)];
+    for snapshot in &message.message_snapshots {
+        parts.push(format!("[transféré] {}", clean(&snapshot.content)));
+    }
+    let embeds = message
+        .embeds
+        .iter()
+        .chain(message.message_snapshots.iter().flat_map(|s| &s.embeds));
+    for e in embeds {
+        let preview = [e.title.as_deref(), e.description.as_deref()]
+            .into_iter()
+            .flatten()
+            .map(clean)
+            .filter(|t| !t.is_empty())
+            .collect::<Vec<_>>()
+            .join(" — ");
+        if !preview.is_empty() {
+            parts.push(format!("[aperçu : {preview}]"));
+        }
+    }
+    let attachments = message.attachments.iter().chain(
+        message
+            .message_snapshots
+            .iter()
+            .flat_map(|s| &s.attachments),
+    );
+    for a in attachments {
+        parts.push(format!("[pièce jointe : {}]", a.filename));
+    }
+    parts
+        .into_iter()
+        .filter(|p| !p.is_empty() && p != "[transféré] ")
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn embed_data(e: &serenity::Embed) -> EmbedData {
@@ -426,6 +542,8 @@ mod tests {
             is_trigger: trigger,
             is_reply_target: reply,
             reply_to: None,
+            reply_quote: None,
+            forwarded: vec![],
             attachments: vec![],
             stickers: vec![],
             embeds: vec![],
@@ -453,6 +571,14 @@ mod tests {
         assert_eq!(result[0].url, "trigger");
         assert_eq!(result[1].url, "same");
         assert_eq!(result[2].url, "reply");
+    }
+
+    #[test]
+    fn bare_trigger_is_only_mentions_and_punctuation() {
+        assert!(is_bare("@Some(roast) (<@999>) ."));
+        assert!(is_bare("<@999> ?!"));
+        assert!(!is_bare("@Some(roast) (<@999>) roast ce weeb"));
+        assert!(!is_bare("@Some(roast) (<@999>) lui"));
     }
 
     #[test]

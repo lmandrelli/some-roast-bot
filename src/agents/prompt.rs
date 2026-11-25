@@ -64,6 +64,8 @@ mod tests {
             is_trigger: false,
             is_reply_target: false,
             reply_to: None,
+            reply_quote: None,
+            forwarded: vec![],
             attachments: vec![],
             stickers: vec![],
             embeds: vec![],
