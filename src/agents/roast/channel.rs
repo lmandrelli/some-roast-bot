@@ -18,10 +18,9 @@ pub async fn roast_channel(
         llm.magic_word(),
     );
     let mut intent = if crate::agents::preambles::trigger_active(trigger, llm.magic_word()) {
-        "L'easter egg est actif : réponds chaleureusement au DÉCLENCHEUR, sans roaster personne."
-            .to_string()
+        "The easter egg is active. Respond warmly to the trigger and do not roast.".to_string()
     } else {
-        "Roaste ce que demande le DÉCLENCHEUR.".to_string()
+        "Roast what the [TRIGGER] asks for, following HOW TO PICK THE TARGET.".to_string()
     };
     if let Some(hint) = super::reply_hint(context) {
         intent = format!("{intent}\n{hint}");

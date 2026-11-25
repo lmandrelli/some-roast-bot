@@ -19,7 +19,7 @@ pub async fn roast_microsoft(
         .map_err(|e| LlmError::Completion(e.to_string()))?;
 
     let topics_section = if past_topics.is_empty() {
-        "Sujets déjà utilisés : aucun pour l'instant.\n".to_string()
+        "Already Used Topics: (none yet)\n".to_string()
     } else {
         let list = past_topics
             .iter()
@@ -27,7 +27,7 @@ pub async fn roast_microsoft(
             .map(|(i, t)| format!("  {}. {}", i + 1, t))
             .collect::<Vec<_>>()
             .join("\n");
-        format!("Sujets déjà utilisés (à ne pas reprendre) :\n{list}\n")
+        format!("Already Used Topics (DO NOT reuse these):\n{list}\n")
     };
 
     let trigger_content = channel_ctx.trigger_content();
@@ -40,17 +40,18 @@ pub async fn roast_microsoft(
         llm_service.magic_word(),
     );
 
-    let preamble = format!("{base_preamble}\n{topics_section}");
+    let preamble = format!("{}\n{}\n---\nContext:\n", base_preamble, topics_section);
 
     let prompt = if magic_active {
         format!(
-            "{author} a parlé de Microsoft ou de Windows. \
-             Réponds gentiment à son message, sans roaster personne."
+            "{author} mentioned Microsoft or Windows. \
+             Respond to their message nicely — do NOT roast anyone."
         )
     } else {
         format!(
-            "{author} a parlé de Microsoft ou de Windows. \
-             Rappel : c'est « Microslop » et « Windaube », toujours."
+            "{author} mentioned Microsoft or Windows. Roast Microslop/Windaube \
+             about what they are talking about, using fresh news. \
+             Remember: it's \"Microslop\" and \"Windaube\", always."
         )
     };
 

@@ -79,7 +79,8 @@ cp .env.example .env
 | `DISCORD_TOKEN`   | Discord bot token                                                 | *(required)*                       |
 | `OPENAI_API_KEY`  | API key of the OpenAI-compatible endpoint                        | *(required)*                       |
 | `OPENAI_BASE_URL` | Base URL of the OpenAI-compatible endpoint                       | `https://openrouter.ai/api/v1`     |
-| `MODEL_NAME`      | Model (or OpenRouter `@preset/<slug>`). Must accept images: they are sent with the transcript | *(required)*                       |
+| `MODEL_NAME`      | Model (or OpenRouter `@preset/<slug>`) used by every agent. Must accept images: they are sent with the transcript. Recommended: `z-ai/glm-5.3-flash` | *(required)*                       |
+| `MODEL_PROVIDERS` | OpenRouter only: comma-separated provider endpoints allowed for `MODEL_NAME`, tried in order with no fallback to others. Recommended: `z-ai/fp8,fireworks` | *(unset: OpenRouter picks)* |
 | `STATUS_MESSAGE`  | Discord custom status                                             | `don't try to talk about Microslop` |
 | `MAGIC_WORD`      | Word that switches every agent to a friendly easter-egg mode     | `magic`                            |
 | `MEMORY_DB_PATH`  | SQLite memory database                                            | `data/memory.db`                   |
@@ -130,7 +131,7 @@ src/
 ├── agents/
 │   ├── mod.rs           # Re-exports
 │   ├── llm/mod.rs       # LlmService: model + Exa MCP tools
-│   ├── preambles.rs     # System prompts + magic-word override
+│   ├── preambles.rs     # System prompts (shared persona) + magic-word override
 │   ├── prompt.rs        # One user message: instruction, transcript, images
 │   ├── images.rs        # Downloads and checks the context images
 │   ├── links.rs         # Previews links Discord did not preview (trigger, replied message)
@@ -170,7 +171,7 @@ src/
 - **One call per roast** — The model gets the transcript and the images (at most 10, trigger and reply target first) in the same prompt, each image right after the message that posted it. Text, images and pages are marked as untrusted data.
 - **Transcript** — Messages are numbered with their age ("il y a 12 min"), replies point to the number they answer, the trigger quotes the message it replies to, and the bot's own messages are marked so it does not repeat a joke. The current date is given for news and fact checks.
 - **Link previews** — Discord often delivers the trigger before its embed. For the trigger and the message it replies to, the bot reads the title and description of up to 3 links itself (public hosts only, 5 s, 512 KB). The model can still open other pages with Exa.
-- **Prompts** — In French (`src/agents/preambles.rs`), with one shared persona: sharp French humour, one precise joke grounded in the conversation, no invented facts, no protected traits. `cargo test eval -- --ignored --nocapture` replays made-up conversations against the configured model to compare prompt changes.
+- **Evaluation** — `cargo test eval -- --ignored --nocapture` replays made-up conversations against the configured model (`EVAL_CASE` picks cases); `cargo test replay -- --ignored --nocapture` rebuilds the transcript of a real conversation exported from the Discord API and prints it with two roasts, without posting. Compare on both before changing a prompt.
 - **Priority-based dispatch** — Event handlers are checked in order: social media links > quoi > Microsoft keywords > truth questions > roast on mention.
 - **Smart translation** — Twitter/X and Bluesky links are translated to French only when the detected language is neither English nor French, using the FxEmbed API.
 - **Separation of concerns** — `agents/` contains pure async LLM logic (no Discord awareness). `bot/` handles all Discord interaction. `fixers/` handles link detection and rewriting independently.

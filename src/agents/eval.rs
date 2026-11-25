@@ -67,7 +67,7 @@ fn preview(url: &str, description: &str) -> EmbedData {
 fn quote(line: &Line) -> String {
     match &line.forward {
         Some((text, e)) => format!(
-            "[transféré] {text} [aperçu : {}]",
+            "[forwarded] {text} [preview: {}]",
             e.description.clone().unwrap_or_default()
         ),
         None => line.text.clone(),
@@ -160,7 +160,7 @@ async fn eval() {
     let mut dot = line(30, &bapt, ".");
     dot.old_reply = Some((
         bot.clone(),
-        "https://fxtwitter.com/devguy/status/1 [aperçu : Benchmarks are an art form — Nice SWE score! Does it survive a lowercase prompt?]".into(),
+        "https://fxtwitter.com/devguy/status/1 [preview: Benchmarks are an art form — Nice SWE score! Does it survive a lowercase prompt?]".into(),
     ));
     let dot_old = context(vec![
         line(

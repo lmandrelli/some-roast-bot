@@ -394,7 +394,7 @@ fn quote_message(message: &serenity::Message) -> String {
     let clean = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
     let mut parts = vec![clean(&message.content)];
     for snapshot in &message.message_snapshots {
-        parts.push(format!("[transféré] {}", clean(&snapshot.content)));
+        parts.push(format!("[forwarded] {}", clean(&snapshot.content)));
     }
     let embeds = message
         .embeds
@@ -409,7 +409,7 @@ fn quote_message(message: &serenity::Message) -> String {
             .collect::<Vec<_>>()
             .join(" — ");
         if !preview.is_empty() {
-            parts.push(format!("[aperçu : {preview}]"));
+            parts.push(format!("[preview: {preview}]"));
         }
     }
     let attachments = message.attachments.iter().chain(
@@ -419,11 +419,11 @@ fn quote_message(message: &serenity::Message) -> String {
             .flat_map(|s| &s.attachments),
     );
     for a in attachments {
-        parts.push(format!("[pièce jointe : {}]", a.filename));
+        parts.push(format!("[attachment: {}]", a.filename));
     }
     parts
         .into_iter()
-        .filter(|p| !p.is_empty() && p != "[transféré] ")
+        .filter(|p| !p.is_empty() && p != "[forwarded] ")
         .collect::<Vec<_>>()
         .join(" ")
 }
@@ -608,7 +608,7 @@ mod tests {
             messages: vec![owner],
         };
         let formatted = formatter::format_messages(&context).remove(0);
-        assert!(formatted.contains("[pièce jointe : cat.png (image/png)]"));
+        assert!(formatted.contains("[attachment: cat.png (image/png)]"));
         assert!(!formatted.contains(url));
     }
 }

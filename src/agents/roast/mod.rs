@@ -27,20 +27,20 @@ pub fn reply_hint(context: &ChannelContext) -> Option<String> {
     let author = author
         .as_ref()
         .map(|a| a.name.as_str())
-        .unwrap_or("quelqu'un");
+        .unwrap_or("someone");
     Some(match context.messages.iter().position(|m| m.id == *id) {
         Some(index) if crate::bot::context::is_bare(&trigger.content) => format!(
-            "Le DÉCLENCHEUR ne dit rien d'autre que ta mention : il te montre le message #{} de {author}. Roaste {author} sur ce message, y compris ce que montrent son lien, son image ou le message transféré.",
+            "The [TRIGGER] says nothing besides your mention: it points at message #{} by {author}. Roast {author} on that message, including what its link, image or forwarded content shows.",
             index + 1
         ),
         Some(index) => format!(
-            "Le DÉCLENCHEUR répond au message #{} de {author} : c'est ta cible, sauf si le déclencheur en désigne clairement une autre.",
+            "The [TRIGGER] replies to message #{} by {author}: that is your target, unless the trigger clearly names another one.",
             index + 1
         ),
         None if trigger.reply_quote.is_some() => format!(
-            "Le DÉCLENCHEUR répond à un message plus ancien de {author}, cité sur sa ligne « ↳ » : c'est ta cible, sauf si le déclencheur en désigne clairement une autre."
+            "The [TRIGGER] replies to an older message by {author}, quoted on its ↳ line: that is your target, unless the trigger clearly names another one."
         ),
-        None => "Le DÉCLENCHEUR répond à un message supprimé : déduis la cible de la conversation récente.".to_string(),
+        None => "The [TRIGGER] replies to a deleted message: work out the target from the recent conversation.".to_string(),
     })
 }
 
@@ -62,7 +62,7 @@ pub async fn try_roast_with_retry(
             prompt.to_string()
         } else {
             format!(
-                "{prompt}\n\nTa réponse précédente était invalide :\n```\n{previous}\n```\nErreur : {error}\nRenvoie UNIQUEMENT le JSON corrigé, avec une chaîne \"response\" non vide (et \"topic\" si demandé)."
+                "{prompt}\n\nYour previous output was invalid:\n```\n{previous}\n```\nValidation error: {error}\nReturn ONLY corrected JSON with a non-empty response string and optional topic string."
             )
         };
         let response = match agent

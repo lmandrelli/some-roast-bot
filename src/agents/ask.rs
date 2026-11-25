@@ -34,15 +34,18 @@ pub(crate) async fn answer(
     context: &ChannelContext,
     max_turns: usize,
 ) -> Result<String, LlmError> {
-    let preamble = crate::agents::preambles::select_preamble(
-        preamble,
-        Some(question),
-        llm_service.magic_word(),
+    let preamble = crate::agents::preambles::with_date(
+        &crate::agents::preambles::select_preamble(
+            preamble,
+            Some(question),
+            llm_service.magic_word(),
+        ),
+        chrono::Utc::now().date_naive(),
     );
     let (agent, _mcp_session) = llm_service.build_agent(&preamble).await?;
     let images = crate::agents::images::load_context_images(context).await;
     let text = format!(
-        "{} (<@{}>) demande avec {command} : {question}",
+        "{} (<@{}>) asks with {command}: {question}",
         asker.name, asker.id
     );
 

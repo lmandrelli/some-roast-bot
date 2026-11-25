@@ -146,8 +146,8 @@ mod tests {
             messages: vec![target, trigger],
         };
         let blocks = formatter::format_messages(&context);
-        assert!(blocks[0].contains("[visé par le déclencheur]"));
-        assert!(blocks[1].starts_with("── DÉCLENCHEUR"));
-        assert!(blocks[1].contains("↳ répond à #1 (u1) : « message 1 »"));
+        assert!(blocks[0].contains("[target of the trigger]"));
+        assert!(blocks[1].starts_with("── [TRIGGER]"));
+        assert!(blocks[1].contains("↳ replies to #1 (u1): « message 1 »"));
     }
 }

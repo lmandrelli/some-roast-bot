@@ -16,7 +16,7 @@ pub async fn roast_truth(
         trigger,
         llm.magic_word(),
     );
-    let mut intent = "Vérifie l'affirmation visée par le DÉCLENCHEUR et tranche.".to_string();
+    let mut intent = "Verify and answer the claim requested by the trigger.".to_string();
     if let Some(hint) = super::reply_hint(context) {
         intent = format!("{intent}\n{hint}");
     }

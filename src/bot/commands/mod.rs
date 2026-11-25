@@ -40,8 +40,8 @@ async fn question_context(ctx: Context<'_>) -> (AuthorIdentity, ChannelContext) 
                 guild_name: ctx
                     .guild()
                     .map(|g| g.name.clone())
-                    .unwrap_or_else(|| "Message privé".into()),
-                channel_name: "inconnu".into(),
+                    .unwrap_or_else(|| "Direct message".into()),
+                channel_name: "unknown".into(),
                 channel_description: None,
                 messages: vec![],
             }
