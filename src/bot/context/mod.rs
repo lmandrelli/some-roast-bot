@@ -6,7 +6,10 @@ use crate::error::BotError;
 
 pub mod formatter;
 
-const CONTEXT_FETCH_LIMIT: usize = 14;
+/// Messages fetched before a trigger.
+const CONTEXT_FETCH_LIMIT: usize = 20;
+/// Messages fetched for a slash command, which has no trigger message.
+pub const SLASH_CONTEXT_LIMIT: u8 = 15;
 pub const VISUAL_LIMIT: usize = 10;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,9 +25,6 @@ pub struct AttachmentData {
     pub filename: String,
     pub description: Option<String>,
     pub content_type: Option<String>,
-    pub size: u32,
-    pub width: Option<u32>,
-    pub height: Option<u32>,
     pub url: String,
 }
 
@@ -72,9 +72,7 @@ pub struct TranscriptMessage {
 
 #[derive(Debug, Clone)]
 pub struct ChannelContext {
-    pub guild_id: Option<serenity::GuildId>,
     pub guild_name: String,
-    pub channel_id: serenity::ChannelId,
     pub channel_name: String,
     pub channel_description: Option<String>,
     pub messages: Vec<TranscriptMessage>,
@@ -86,12 +84,6 @@ impl ChannelContext {
             .iter()
             .find(|m| m.is_trigger)
             .map(|m| m.content.as_str())
-    }
-}
-
-impl std::fmt::Display for ChannelContext {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&formatter::format_channel_context(self))
     }
 }
 
@@ -128,7 +120,52 @@ pub async fn fetch_channel_context(
         raw.push(item);
     }
 
-    let guild_id = trigger.guild_id;
+    let reply_target_id = trigger
+        .referenced_message
+        .as_ref()
+        .map(|m| m.id)
+        .or_else(|| {
+            trigger
+                .message_reference
+                .as_ref()
+                .and_then(|r| r.message_id)
+        });
+    build_context(
+        ctx,
+        channel_id,
+        trigger.guild_id,
+        raw,
+        Some(trigger.id),
+        reply_target_id,
+    )
+    .await
+}
+
+/// The last `limit` messages of a channel, for a slash command.
+pub async fn fetch_recent_context(
+    ctx: &serenity::Context,
+    channel_id: serenity::ChannelId,
+    guild_id: Option<serenity::GuildId>,
+    limit: u8,
+) -> Result<ChannelContext, BotError> {
+    let mut raw = channel_id
+        .messages(
+            &ctx.http,
+            serenity::builder::GetMessages::new().limit(limit),
+        )
+        .await?;
+    raw.sort_by_key(|m| (m.timestamp.unix_timestamp(), m.id.get()));
+    build_context(ctx, channel_id, guild_id, raw, None, None).await
+}
+
+async fn build_context(
+    ctx: &serenity::Context,
+    channel_id: serenity::ChannelId,
+    guild_id: Option<serenity::GuildId>,
+    raw: Vec<serenity::Message>,
+    trigger_id: Option<serenity::MessageId>,
+    reply_target_id: Option<serenity::MessageId>,
+) -> Result<ChannelContext, BotError> {
     let self_id = ctx.cache.current_user().id;
     let mut identities = HashMap::new();
     for message in &raw {
@@ -168,16 +205,6 @@ pub async fn fetch_channel_context(
         );
     }
 
-    let reply_target_id = trigger
-        .referenced_message
-        .as_ref()
-        .map(|m| m.id)
-        .or_else(|| {
-            trigger
-                .message_reference
-                .as_ref()
-                .and_then(|r| r.message_id)
-        });
     let mut messages = Vec::new();
     for message in &raw {
         let content = expand_mentions(&message.content, &message.mentions, &identities);
@@ -188,9 +215,6 @@ pub async fn fetch_channel_context(
                 filename: a.filename.clone(),
                 description: a.description.clone(),
                 content_type: a.content_type.clone(),
-                size: a.size,
-                width: a.width,
-                height: a.height,
                 url: a.url.clone(),
             })
             .collect::<Vec<_>>();
@@ -251,7 +275,7 @@ pub async fn fetch_channel_context(
             timestamp: message.timestamp,
             author: identities[&message.author.id].clone(),
             content,
-            is_trigger: message.id == trigger.id,
+            is_trigger: Some(message.id) == trigger_id,
             is_reply_target: Some(message.id) == reply_target_id,
             reply_to: reply_id.map(|id| (id, reply_author)),
             attachments,
@@ -281,9 +305,7 @@ pub async fn fetch_channel_context(
         },
     };
     Ok(ChannelContext {
-        guild_id,
         guild_name,
-        channel_id,
         channel_name,
         channel_description,
         messages,
@@ -451,13 +473,16 @@ mod tests {
             filename: "cat.png".into(),
             description: None,
             content_type: Some("image/png".into()),
-            size: 42,
-            width: Some(10),
-            height: Some(10),
             url: url.into(),
         });
-        let formatted = formatter::format_transcript_message(&owner);
-        assert!(formatted.contains("filename=\"cat.png\""));
+        let context = ChannelContext {
+            guild_name: "g".into(),
+            channel_name: "c".into(),
+            channel_description: None,
+            messages: vec![owner],
+        };
+        let formatted = formatter::format_messages(&context).remove(0);
+        assert!(formatted.contains("[pièce jointe : cat.png (image/png)]"));
         assert!(!formatted.contains(url));
     }
 }

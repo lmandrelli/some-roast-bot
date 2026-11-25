@@ -6,17 +6,12 @@ pub use microsoft::roast_microsoft;
 pub use truth::roast_truth;
 
 use crate::{
-    agents::llm::LlmService,
-    bot::context::{ChannelContext, canonical_image_key, formatter},
+    agents::{llm::LlmService, prompt::prompt_message},
+    bot::context::ChannelContext,
     error::LlmError,
 };
-use rig::{
-    OneOrMany,
-    completion::Prompt,
-    message::{Image, Message, UserContent},
-};
+use rig::completion::Prompt;
 use serde::Deserialize;
-use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct RoastOutput {
@@ -25,35 +20,23 @@ pub struct RoastOutput {
     pub topic: Option<String>,
 }
 
-/// One user message with the whole context: the instruction, the transcript,
-/// and each downloaded image right after the message that posted it.
-fn prompt_message(
-    text: String,
-    context: &ChannelContext,
-    images: &HashMap<String, Image>,
-) -> Message {
-    let mut content = vec![UserContent::text(format!(
-        "{}\n{}",
-        text,
-        formatter::format_header(context)
-    ))];
-    let mut attached = HashSet::new();
-    for message in &context.messages {
-        content.push(UserContent::text(formatter::format_transcript_message(
-            message,
-        )));
-        for visual in &message.visuals {
-            let key = canonical_image_key(&visual.url);
-            if let Some(image) = images.get(&key)
-                && attached.insert(key)
-            {
-                content.push(UserContent::Image(image.clone()));
-            }
-        }
-    }
-    Message::User {
-        content: OneOrMany::many(content).expect("prompt always has text"),
-    }
+/// Points the model at the message the trigger replies to, when there is one.
+pub fn reply_hint(context: &ChannelContext) -> Option<String> {
+    let trigger = context.messages.iter().find(|m| m.is_trigger)?;
+    let (id, author) = trigger.reply_to.as_ref()?;
+    let author = author
+        .as_ref()
+        .map(|a| a.name.as_str())
+        .unwrap_or("quelqu'un");
+    Some(match context.messages.iter().position(|m| m.id == *id) {
+        Some(index) => format!(
+            "Le DÉCLENCHEUR répond au message #{} de {author} : c'est ta cible, sauf si le déclencheur en désigne clairement une autre.",
+            index + 1
+        ),
+        None => format!(
+            "Le DÉCLENCHEUR répond à un message de {author} absent du contexte : appuie-toi sur le reste de la conversation."
+        ),
+    })
 }
 
 pub async fn try_roast_with_retry(
@@ -62,6 +45,9 @@ pub async fn try_roast_with_retry(
     prompt: &str,
     context: &ChannelContext,
 ) -> Result<RoastOutput, LlmError> {
+    let mut context = context.clone();
+    crate::agents::links::add_link_previews(&mut context).await;
+    let context = &context;
     let images = crate::agents::images::load_context_images(context).await;
     let (agent, _session) = llm.build_agent(preamble).await?;
     let mut previous = String::new();
@@ -71,7 +57,7 @@ pub async fn try_roast_with_retry(
             prompt.to_string()
         } else {
             format!(
-                "{prompt}\n\nYour previous output was invalid:\n```\n{previous}\n```\nValidation error: {error}\nReturn ONLY corrected JSON with a non-empty response string and optional topic string."
+                "{prompt}\n\nTa réponse précédente était invalide :\n```\n{previous}\n```\nErreur : {error}\nRenvoie UNIQUEMENT le JSON corrigé, avec une chaîne \"response\" non vide (et \"topic\" si demandé)."
             )
         };
         let response = match agent
@@ -127,90 +113,6 @@ pub fn parse_roast_response(raw: &str) -> Result<RoastOutput, LlmError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bot::context::{AuthorIdentity, TranscriptMessage, Visual};
-    use poise::serenity_prelude as serenity;
-    use rig::message::DocumentSourceKind;
-
-    fn transcript_message(id: u64, urls: &[&str]) -> TranscriptMessage {
-        TranscriptMessage {
-            id: serenity::MessageId::new(id),
-            timestamp: serenity::Timestamp::from_unix_timestamp(id as i64).unwrap(),
-            author: AuthorIdentity {
-                id: serenity::UserId::new(id),
-                name: format!("u{id}"),
-                is_bot: false,
-                is_self: false,
-            },
-            content: format!("message {id}"),
-            is_trigger: false,
-            is_reply_target: false,
-            reply_to: None,
-            attachments: vec![],
-            stickers: vec![],
-            embeds: vec![],
-            visuals: urls
-                .iter()
-                .map(|url| Visual {
-                    url: (*url).into(),
-                    mime: None,
-                })
-                .collect(),
-        }
-    }
-
-    fn image(data: &str) -> Image {
-        Image {
-            data: DocumentSourceKind::Base64(data.into()),
-            media_type: None,
-            detail: None,
-            additional_params: None,
-        }
-    }
-
-    /// Text parts as their first line, images as `image:<data>`.
-    fn parts(message: Message) -> Vec<String> {
-        let Message::User { content } = message else {
-            panic!("expected a user message");
-        };
-        content
-            .into_iter()
-            .map(|part| match part {
-                UserContent::Text(text) => text.text.lines().next().unwrap_or("").to_string(),
-                UserContent::Image(Image {
-                    data: DocumentSourceKind::Base64(data),
-                    ..
-                }) => format!("image:{data}"),
-                _ => panic!("unexpected content"),
-            })
-            .collect()
-    }
-
-    #[test]
-    fn images_follow_the_message_that_posted_them_once() {
-        let cat = "https://cdn.discordapp.com/attachments/1/cat.png?ex=a";
-        let cat_resigned = "https://cdn.discordapp.com/attachments/1/cat.png?ex=b";
-        let missing = "https://example.com/not-downloaded.png";
-        let context = ChannelContext {
-            guild_id: None,
-            guild_name: "g".into(),
-            channel_id: serenity::ChannelId::new(1),
-            channel_name: "c".into(),
-            channel_description: None,
-            messages: vec![
-                transcript_message(1, &[cat, missing]),
-                transcript_message(2, &[]),
-                transcript_message(3, &[cat_resigned]),
-            ],
-        };
-        let images = HashMap::from([(canonical_image_key(cat), image("cat"))]);
-        let parts = parts(prompt_message("roast".into(), &context, &images));
-        assert_eq!(parts.len(), 5);
-        assert_eq!(parts[0], "roast");
-        assert!(parts[1].contains("message_id=1"));
-        assert_eq!(parts[2], "image:cat");
-        assert!(parts[3].contains("message_id=2"));
-        assert!(parts[4].contains("message_id=3"));
-    }
     #[test]
     fn parses_json_contract() {
         assert_eq!(

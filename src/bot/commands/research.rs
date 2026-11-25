@@ -8,9 +8,10 @@ pub async fn research(
 ) -> Result<(), Error> {
     ctx.defer().await?;
 
-    match crate::agents::research(&ctx.data().llm_service, &question).await {
+    let (asker, channel) = super::question_context(ctx).await;
+    match crate::agents::research(&ctx.data().llm_service, &asker, &question, &channel).await {
         Ok(response) => {
-            ctx.say(response).await?;
+            super::send_answer(ctx, &response).await?;
         }
         Err(e) => {
             tracing::error!("Research command failed: {:?}", e);
