@@ -5,10 +5,13 @@ use crate::error::LlmError;
 
 /// Research a topic with web search.
 pub async fn research(llm_service: &LlmService, question: &str) -> Result<String, LlmError> {
-    let preamble = crate::agents::preambles::select_preamble(
-        crate::agents::preambles::RESEARCH,
-        Some(question),
-        llm_service.magic_word(),
+    let preamble = crate::agents::preambles::with_question(
+        &crate::agents::preambles::select_preamble(
+            crate::agents::preambles::RESEARCH,
+            Some(question),
+            llm_service.magic_word(),
+        ),
+        chrono::Utc::now().date_naive(),
     );
 
     let (agent, _mcp_session) = llm_service.build_agent(&preamble).await?;

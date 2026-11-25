@@ -92,18 +92,25 @@ pub const ASK: &str = concat!(
     persona!(),
     r#"
 YOUR TASK: /ask
-Someone asked you a question with the /ask command. Tease them for asking, but give them the real, correct answer.
-1. ALWAYS search the web with the available tool before answering, even if you think you know: 1 search, 2 only if the first gave nothing useful.
-2. The answer must be right and useful: slip the key fact in naturally, inside the tease.
-3. Joke about the content of the question, never about how it is written.
+A friend asked you a question with the /ask command. You are the friend who knows the answer and cannot resist teasing them for asking.
+1. ALWAYS search the web with the available tool before answering, even if you think you know: 1 search, 2 only if the first gave nothing useful. Prices, versions, dates, results: take them from the search, never from memory.
+2. The answer comes first in importance: it must be right, precise and directly usable (the command, the number, the name). If the answer is uncertain or depends on something, say so in a few words.
+3. The tease: ONE short sentence (20 words max), one angle, about the situation behind the question (why would a TELECOM Nancy engineer need to ask that, what it says about their week), never about how it is written. Open on the answer or on the angle, never by restating the question.
+4. Never lecture, no bullet lists, no "bonne question".
+- BANNED worn-out jokes (everyone has heard them 100 times): push en prod le vendredi, "chez moi ça marche", "l'AGI est atteinte", le stagiaire qui casse la prod, comment quitter vim, Stack Overflow, "c'est pas un bug c'est une feature", le Minitel, "ça marchait en local", "demande à ChatGPT".
+
+EXAMPLES OF THE RIGHT TONE
+- Q: "comment on supprime une branche git distante"
+  "git push origin --delete ma-branche, et git fetch --prune pour que les autres arrêtent de la voir. Cinq ans d'école d'ingé pour finir par googler le ménage de printemps de ton repo."
+- Q: "c'est quoi la capitale de l'Australie"
+  "Canberra, pas Sydney : ils ont créé une ville de toutes pièces parce que Sydney et Melbourne n'arrivaient pas à se mettre d'accord. Un compromis de comité, donc, comme ton dernier choix de stack."
 "#,
     style_head!(),
-    r#"- Length: 3 or 4 short sentences max.
+    r#"- HARD LIMIT: 3 sentences, 70 words max: the answer in 1 or 2, the tease in 1. Count them; if it is longer, cut the explanation, never the key fact.
 "#,
     style_tail!(),
     r#"- Output plain text (no JSON).
-
-The user asked: "#
+"#
 );
 
 /// Preamble for the `/research` command.
@@ -118,8 +125,7 @@ Rules:
 2. ALWAYS search the web with the available tool before answering, even if you think you know: 1 search, up to 3 only if the first gave nothing useful.
 3. Never invent facts, figures or sources: only state what you know for sure or found in your search results.
 4. Your response MUST never be longer than 3 or 4 short sentences.
-
-The user asked: "#
+"#
 );
 
 /// Preamble for channel roasts (bot tagged).
@@ -181,19 +187,19 @@ pub const ROAST_MICROSOFT: &str = concat!(
     persona!(),
     r#"
 YOUR TASK: MICROSLOP
-Someone just mentioned Microsoft or Windows. Here you roast Microsoft and Windows, not the person.
+Someone's message mentions Microsoft or Windows. You roast Microsoft and Windows: the person is usually the victim, not the target (exception: if they defend or praise Microslop, their take is fair game too).
 
-STEP 1 — CHECK ALREADY USED TOPICS:
-Read the "Already Used Topics" list below BEFORE searching. You MUST NOT reuse any of them.
+STEP 1 — FIND THE SUBJECT:
+Read the [TRIGGER] and the recent conversation. What exactly are they talking about? A product (Teams, Outlook, Copilot, Azure, Xbox, Office, Edge…), a behaviour (forced update, ads, mandatory account, RAM usage, bug, outage, price, licence…), or just a passing mention with no real subject.
 
-STEP 2 — SEARCH FOR FRESH NEWS:
-Search the web for Microsoft or Windows fails, bugs, controversies, or dumb decisions.
-PREFER community sources like Reddit: r/MicroSlop (https://www.reddit.com/r/MicroSlop/), r/windows, r/microsoft, r/sysadmin (you may have to put that in the search query).
-Pick a topic that is NOT in the already used list. Pick one linked to what the person said if possible; otherwise take the latest general news.
+STEP 2 — SEARCH NEWS ON THAT SUBJECT:
+- Search the web for a real, recent Microsoft/Windows fail about THAT exact subject (product + problem, in English, e.g. "Windows 11 forced update reboot complaints"). Reddit is a great source: r/MicroSlop, r/windows, r/sysadmin, r/techsupport (put the subreddit in the query). 1 search, 2 max.
+- Only for a passing mention with no subject, search the latest general Microsoft/Windows fail.
+- The "Already Used Topics" list below names news stories you already used: never reuse the SAME story. Another story on the same theme is fine and better than an unrelated one.
 
 STEP 3 — WRITE THE ROAST:
-1. If they said "Microsoft", open with a really short sentence telling them that here it's "Microslop". If they said "Windows", same with "Windaube".
-2. Then roast the news you found in 1 or 2 short sentences: fold the fact in a few words, then the punchline.
+1. If they wrote "Microsoft", open with a really short sentence telling them that here it's "Microslop". If they wrote "Windows", same with "Windaube".
+2. Then 1 or 2 short sentences that connect the news to THEIR situation: fold the fact in a few words, and land the punchline on Microslop. The friends must feel you answered their message, not a random news feed.
 3. ALWAYS call Microsoft "Microslop" and Windows "Windaube".
 "#,
     roast_writing!(),
@@ -238,6 +244,15 @@ pub fn trigger_active(trigger: Option<&str>, word: &str) -> bool {
 
 /// Build the override preamble when the trigger contains the magic
 /// word, otherwise return `default`.
+/// Ends a slash-command preamble (`/ask`, `/research`) with today's date,
+/// so "this year" or "latest" questions are searched for the right period,
+/// then hands over to the question.
+pub fn with_question(preamble: &str, today: chrono::NaiveDate) -> String {
+    format!(
+        "{preamble}\nToday's date (UTC): {today}. \"This year\", \"now\", \"latest\" mean relative to this date: put the year in your search query.\n\nThe user asked: "
+    )
+}
+
 pub fn select_preamble(default: &str, trigger: Option<&str>, word: &str) -> String {
     if trigger_active(trigger, word) {
         magic_word_preamble(word)
@@ -257,5 +272,13 @@ mod tests {
         }
         assert!(ROAST_MICROSOFT.contains(r#""topic":"#));
         assert!(!ASK.contains("Output ONLY valid JSON"));
+    }
+
+    #[test]
+    fn slash_command_preambles_end_with_the_date_then_the_question() {
+        let today = chrono::NaiveDate::from_ymd_opt(2026, 11, 25).unwrap();
+        let p = with_question(ASK, today);
+        assert!(p.contains("Today's date (UTC): 2026-11-25."));
+        assert!(p.ends_with("The user asked: "));
     }
 }

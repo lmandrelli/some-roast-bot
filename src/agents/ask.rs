@@ -5,10 +5,13 @@ use crate::error::LlmError;
 
 /// Ask the AI a question with sarcastic roast flavor.
 pub async fn ask(llm_service: &LlmService, question: &str) -> Result<String, LlmError> {
-    let preamble = crate::agents::preambles::select_preamble(
-        crate::agents::preambles::ASK,
-        Some(question),
-        llm_service.magic_word(),
+    let preamble = crate::agents::preambles::with_question(
+        &crate::agents::preambles::select_preamble(
+            crate::agents::preambles::ASK,
+            Some(question),
+            llm_service.magic_word(),
+        ),
+        chrono::Utc::now().date_naive(),
     );
 
     let (agent, _mcp_session) = llm_service.build_agent(&preamble).await?;
