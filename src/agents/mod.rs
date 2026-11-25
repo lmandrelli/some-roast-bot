@@ -12,3 +12,5 @@ pub use ask::ask;
 pub use research::research;
 pub use roast::{roast_channel, roast_microsoft, roast_truth};
 
+#[cfg(test)]
+mod eval;
